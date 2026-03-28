@@ -134,6 +134,14 @@ One simple pattern is:
 nohup .build/release/fizze-assistant run --config /path/to/fizze-assistant.local.json > fizze-assistant.log 2>&1 &
 ```
 
+There is also a small helper for that SSH-friendly background case:
+
+```bash
+./scripts/start-nohup.sh
+```
+
+It runs `scripts/setup.sh` under `nohup`, writes output to `fizze-assistant.log`, and stores the process ID in `.data/fizze-assistant.pid`.
+
 That keeps the process easy to start over SSH without committing to a larger deployment setup first.
 
 ## Secret Safety
