@@ -14,6 +14,7 @@ struct DiscordRESTClient {
     private let session: URLSession
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let maxRetryAttempts = 5
 
     // MARK: Lifecycle
 
@@ -171,16 +172,62 @@ struct DiscordRESTClient {
             "path": .string(path),
         ])
 
+        return try await performRawRequest(request, path: path, attempt: 0)
+    }
+
+    private func performRawRequest(_ request: URLRequest, path: String, attempt: Int) async throws -> Data {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw RESTError.invalidResponse
         }
 
-        guard (200 ... 299).contains(http.statusCode) else {
-            throw RESTError.discordError(statusCode: http.statusCode, body: String(data: data, encoding: .utf8) ?? "<unreadable>")
+        if (200 ... 299).contains(http.statusCode) {
+            return data
         }
 
-        return data
+        if http.statusCode == 429, attempt < maxRetryAttempts {
+            let delay = rateLimitDelay(response: http, body: data)
+            logger.warning("Discord REST rate limited request; retrying.", metadata: [
+                "path": .string(path),
+                "retry_after_seconds": .string(String(delay)),
+                "attempt": .string(String(attempt + 1)),
+            ])
+            try await Task.sleep(for: .seconds(delay))
+            return try await performRawRequest(request, path: path, attempt: attempt + 1)
+        }
+
+        if (500 ... 599).contains(http.statusCode), attempt < maxRetryAttempts {
+            let delay = min(pow(2.0, Double(attempt)), 30.0)
+            logger.warning("Discord REST server error; retrying with backoff.", metadata: [
+                "path": .string(path),
+                "status_code": .string(String(http.statusCode)),
+                "retry_after_seconds": .string(String(delay)),
+                "attempt": .string(String(attempt + 1)),
+            ])
+            try await Task.sleep(for: .seconds(delay))
+            return try await performRawRequest(request, path: path, attempt: attempt + 1)
+        }
+
+        throw RESTError.discordError(statusCode: http.statusCode, body: String(data: data, encoding: .utf8) ?? "<unreadable>")
+    }
+
+    func rateLimitDelay(response: HTTPURLResponse, body: Data) -> Double {
+        if let header = response.value(forHTTPHeaderField: "Retry-After"), let value = Double(header) {
+            return max(value, 1)
+        }
+
+        if let header = response.value(forHTTPHeaderField: "X-RateLimit-Reset-After"), let value = Double(header) {
+            return max(value, 1)
+        }
+
+        if
+            let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+            let retryAfter = object["retry_after"] as? Double
+        {
+            return max(retryAfter, 1)
+        }
+
+        return 1
     }
 }
 

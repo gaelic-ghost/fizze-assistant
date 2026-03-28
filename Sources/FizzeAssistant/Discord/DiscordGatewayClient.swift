@@ -36,6 +36,7 @@ actor DiscordGatewayClient {
     private var heartbeatIntervalNanoseconds: UInt64 = 30_000_000_000
     private var awaitingHeartbeatACK = false
     private var isRunning = false
+    private var reconnectAttempt = 0
 
     // MARK: Lifecycle
 
@@ -99,6 +100,15 @@ actor DiscordGatewayClient {
 
         let targetURL = resumeURL ?? gatewayURL
         do {
+            let delay = reconnectDelaySeconds(forAttempt: reconnectAttempt)
+            if delay > 0 {
+                logger.warning("Reconnecting to Discord Gateway with backoff.", metadata: [
+                    "delay_seconds": .string(String(format: "%.2f", delay)),
+                    "attempt": .string(String(reconnectAttempt + 1)),
+                ])
+                try await Task.sleep(for: .seconds(delay))
+            }
+            reconnectAttempt += 1
             try await connect(using: targetURL)
         } catch {
             logger.error("Failed to reconnect to Discord Gateway.", metadata: ["error": .string(String(describing: error))])
@@ -119,6 +129,9 @@ actor DiscordGatewayClient {
                 }
             } catch is CancellationError {
                 return
+            } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled {
+                logger.debug("Gateway receive was cancelled.")
+                return
             } catch {
                 logger.error("Gateway receive failed; reconnecting.", metadata: ["error": .string(String(describing: error))])
                 await reconnect()
@@ -130,6 +143,7 @@ actor DiscordGatewayClient {
     private func handle(messageData: Data) async throws {
         let envelope = try decoder.decode(DiscordGatewayEnvelope.self, from: messageData)
         sequenceNumber = envelope.s ?? sequenceNumber
+        reconnectAttempt = 0
 
         switch envelope.op {
         case DiscordGatewayOpCode.hello:
@@ -281,6 +295,12 @@ actor DiscordGatewayClient {
         default:
             throw GatewayError.invalidHeartbeatInterval
         }
+    }
+
+    private func reconnectDelaySeconds(forAttempt attempt: Int) -> Double {
+        let exponential = min(pow(2.0, Double(attempt)), 30.0)
+        let jitter = Double.random(in: 0 ... 0.5)
+        return attempt == 0 ? 0.5 + jitter : exponential + jitter
     }
 }
 
