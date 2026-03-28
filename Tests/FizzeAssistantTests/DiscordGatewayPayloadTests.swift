@@ -73,4 +73,38 @@ struct DiscordGatewayPayloadTests {
         #expect(sessionID == "session-123")
         #expect(resumeURL == "wss://gateway.discord.gg")
     }
+
+    @Test
+    func messageCreatePayloadDecodesChannelIDWithSnakeCaseStrategy() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+        let data = """
+        {
+          "op": 0,
+          "d": {
+            "id": "message-123",
+            "channel_id": "channel-123",
+            "guild_id": "guild-123",
+            "content": "fizze",
+            "author": {
+              "id": "user-123",
+              "username": "gale",
+              "global_name": "Gale"
+            }
+          },
+          "s": 2,
+          "t": "MESSAGE_CREATE"
+        }
+        """.data(using: .utf8)!
+
+        let envelope = try decoder.decode(DiscordGatewayEnvelope.self, from: data)
+        let payloadData = try JSONEncoder().encode(envelope.d)
+        let event = try decoder.decode(DiscordMessageEvent.self, from: payloadData)
+
+        #expect(envelope.t == "MESSAGE_CREATE")
+        #expect(event.channelID == "channel-123")
+        #expect(event.guildID == "guild-123")
+        #expect(event.author.displayName == "Gale")
+    }
 }

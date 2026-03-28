@@ -31,7 +31,7 @@ struct DiscordGuild: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id
         case name
-        case ownerID = "owner_id"
+        case ownerID = "ownerId"
     }
 }
 
@@ -40,13 +40,6 @@ struct DiscordChannel: Codable, Sendable {
     var name: String?
     var type: Int
     var permissionOverwrites: [DiscordPermissionOverwrite]?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case type
-        case permissionOverwrites = "permission_overwrites"
-    }
 }
 
 struct DiscordPermissionOverwrite: Codable, Sendable {
@@ -67,10 +60,6 @@ struct DiscordGatewayBotResponse: Codable, Sendable {
 
 struct DiscordAuditLogResponse: Codable, Sendable {
     var auditLogEntries: [DiscordAuditLogEntry]
-
-    enum CodingKeys: String, CodingKey {
-        case auditLogEntries = "audit_log_entries"
-    }
 }
 
 struct DiscordAuditLogEntry: Codable, Sendable {
@@ -81,9 +70,9 @@ struct DiscordAuditLogEntry: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case actionType = "action_type"
-        case targetID = "target_id"
-        case userID = "user_id"
+        case actionType
+        case targetID = "targetId"
+        case userID = "userId"
     }
 }
 
@@ -101,15 +90,6 @@ struct DiscordApplicationCommandOption: Codable, Sendable {
     var required: Bool?
     var channelTypes: [Int]?
     var options: [DiscordApplicationCommandOption]? = nil
-
-    enum CodingKeys: String, CodingKey {
-        case type
-        case name
-        case description
-        case required
-        case channelTypes = "channel_types"
-        case options
-    }
 }
 
 struct DiscordInteraction: Codable, Sendable {
@@ -122,7 +102,7 @@ struct DiscordInteraction: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case applicationID = "application_id"
+        case applicationID = "applicationId"
         case type
         case token
         case member
@@ -162,7 +142,7 @@ struct DiscordCreateDMRequest: Codable, Sendable {
     var recipientID: DiscordSnowflake
 
     enum CodingKeys: String, CodingKey {
-        case recipientID = "recipient_id"
+        case recipientID = "recipientId"
     }
 }
 
@@ -175,10 +155,6 @@ struct DiscordGatewayEnvelope: Codable, Sendable {
 
 struct DiscordHello: Codable, Sendable {
     var heartbeatInterval: Int
-
-    enum CodingKeys: String, CodingKey {
-        case heartbeatInterval = "heartbeat_interval"
-    }
 }
 
 struct DiscordGatewayReady: Codable, Sendable {
@@ -186,8 +162,8 @@ struct DiscordGatewayReady: Codable, Sendable {
     var resumeGatewayURL: String
 
     enum CodingKeys: String, CodingKey {
-        case sessionID = "session_id"
-        case resumeGatewayURL = "resume_gateway_url"
+        case sessionID = "sessionId"
+        case resumeGatewayURL = "resumeGatewayUrl"
     }
 }
 
@@ -213,11 +189,11 @@ struct DiscordMessageEvent: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case channelID = "channel_id"
-        case guildID = "guild_id"
+        case channelID = "channelId"
+        case guildID = "guildId"
         case content
         case author
-        case webhookID = "webhook_id"
+        case webhookID = "webhookId"
     }
 }
 

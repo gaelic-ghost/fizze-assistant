@@ -36,6 +36,7 @@ actor DiscordGatewayClient {
     private var heartbeatIntervalNanoseconds: UInt64 = 30_000_000_000
     private var awaitingHeartbeatACK = false
     private var isRunning = false
+    private var isReconnecting = false
     private var reconnectAttempt = 0
 
     // MARK: Lifecycle
@@ -93,9 +94,14 @@ actor DiscordGatewayClient {
 
     private func reconnect() async {
         guard isRunning else { return }
+        guard !isReconnecting else { return }
+        isReconnecting = true
+        defer { isReconnecting = false }
 
         heartbeatTask?.cancel()
+        receiveTask?.cancel()
         webSocketTask?.cancel(with: .goingAway, reason: nil)
+        awaitingHeartbeatACK = false
 
         let targetURL = resumeURL ?? gatewayURL
         do {
