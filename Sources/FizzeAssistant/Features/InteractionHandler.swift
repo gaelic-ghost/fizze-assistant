@@ -152,8 +152,8 @@ actor InteractionHandler {
         let options = subcommand.options ?? []
         switch subcommand.name {
         case "show":
-            let runtime = await configurationStore.runtimeConfiguration()
-            let json = try runtime.prettyPrintedJSON()
+            let configurationFile = await configurationStore.configurationFileContents()
+            let json = try configurationFile.prettyPrintedJSON()
             try await respond(interaction, content: "```json\n\(json)\n```", ephemeral: true)
 
         case "set":
@@ -177,7 +177,7 @@ actor InteractionHandler {
             try await respond(interaction, content: removed ? "Removed trigger `\(trigger)`." : "No trigger matched `\(trigger)`.", ephemeral: true)
 
         case "trigger-list":
-            let runtime = await configurationStore.runtimeConfiguration()
+            let runtime = await configurationStore.configurationFileContents()
             let content: String
             if runtime.iconicTriggers.isEmpty {
                 content = "No exact-match triggers are configured."

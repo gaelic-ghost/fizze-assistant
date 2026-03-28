@@ -1,6 +1,6 @@
 import Foundation
 
-struct InstallConfiguration: Codable, Sendable {
+struct BotConfigurationFile: Codable, Sendable {
     // MARK: Stored Properties
 
     var applicationID: String
@@ -9,76 +9,10 @@ struct InstallConfiguration: Codable, Sendable {
     var allowedStaffRoleIDs: [String]
     var allowedConfigRoleIDs: [String]
     var databasePath: String
-    var runtimeConfigPath: String
-
-    // MARK: Defaults
-
-    static let defaults = InstallConfiguration(
-        applicationID: "",
-        guildID: "",
-        defaultMemberRoleID: "",
-        allowedStaffRoleIDs: [],
-        allowedConfigRoleIDs: [],
-        databasePath: ".data/fizze-assistant.sqlite",
-        runtimeConfigPath: ".data/runtime-config.json"
-    )
-
-    // MARK: Validation
-
-    func readyForRuntime(botToken: String) throws -> InstallConfiguration {
-        let requiredValues: [(String, String)] = [
-            ("DISCORD_BOT_TOKEN", botToken),
-            ("DISCORD_APPLICATION_ID", applicationID),
-            ("DISCORD_GUILD_ID", guildID),
-            ("DISCORD_DEFAULT_MEMBER_ROLE_ID", defaultMemberRoleID),
-        ]
-
-        let missing = requiredValues
-            .filter { $0.1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .map(\.0)
-
-        guard missing.isEmpty else {
-            throw UserFacingError("Missing required configuration: \(missing.joined(separator: ", "))")
-        }
-
-        guard !allowedStaffRoleIDs.isEmpty else {
-            throw UserFacingError("Configure at least one staff role ID via `DISCORD_ALLOWED_STAFF_ROLE_IDS` or the local config file.")
-        }
-
-        guard !allowedConfigRoleIDs.isEmpty else {
-            throw UserFacingError("Configure at least one config owner role ID via `DISCORD_ALLOWED_CONFIG_ROLE_IDS` or the local config file.")
-        }
-
-        return self
-    }
-
-    var setupWarnings: [String] {
-        var warnings: [String] = []
-        if applicationID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            warnings.append("Application ID is not configured yet.")
-        }
-        if guildID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            warnings.append("Guild ID is not configured yet.")
-        }
-        if defaultMemberRoleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            warnings.append("Default member role ID is not configured yet.")
-        }
-        if allowedStaffRoleIDs.isEmpty {
-            warnings.append("No staff role IDs are configured yet.")
-        }
-        if allowedConfigRoleIDs.isEmpty {
-            warnings.append("No config owner role IDs are configured yet.")
-        }
-        return warnings
-    }
-}
-
-struct RuntimeConfiguration: Codable, Sendable {
-    // MARK: Stored Properties
-
     var welcomeChannelID: String?
     var leaveChannelID: String?
     var modLogChannelID: String?
+    var suggestionsChannelID: String?
     var warnUsersViaDM: Bool
     var welcomeMessage: String
     var voluntaryLeaveMessage: String
@@ -93,10 +27,17 @@ struct RuntimeConfiguration: Codable, Sendable {
 
     // MARK: Defaults
 
-    static let defaults = RuntimeConfiguration(
+    static let defaults = BotConfigurationFile(
+        applicationID: "",
+        guildID: "",
+        defaultMemberRoleID: "",
+        allowedStaffRoleIDs: [],
+        allowedConfigRoleIDs: [],
+        databasePath: ".data/fizze-assistant.sqlite",
         welcomeChannelID: nil,
         leaveChannelID: nil,
         modLogChannelID: nil,
+        suggestionsChannelID: nil,
         warnUsersViaDM: false,
         welcomeMessage: "Welcome to the server, {user_mention}!",
         voluntaryLeaveMessage: "{username} left the server.",
@@ -112,7 +53,30 @@ struct RuntimeConfiguration: Codable, Sendable {
 
     // MARK: Validation
 
-    func validated() throws -> RuntimeConfiguration {
+    func readyForRuntime(botToken: String) throws -> BotConfigurationFile {
+        let requiredValues: [(String, String)] = [
+            ("DISCORD_BOT_TOKEN", botToken),
+            ("applicationID", applicationID),
+            ("guildID", guildID),
+            ("defaultMemberRoleID", defaultMemberRoleID),
+        ]
+
+        let missing = requiredValues
+            .filter { $0.1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map(\.0)
+
+        guard missing.isEmpty else {
+            throw UserFacingError("Missing required configuration: \(missing.joined(separator: ", "))")
+        }
+
+        guard !allowedStaffRoleIDs.isEmpty else {
+            throw UserFacingError("Configure at least one staff role ID in the JSON config.")
+        }
+
+        guard !allowedConfigRoleIDs.isEmpty else {
+            throw UserFacingError("Configure at least one config owner role ID in the JSON config.")
+        }
+
         guard triggerCooldownSeconds > 0 else {
             throw UserFacingError("`triggerCooldownSeconds` must be greater than zero.")
         }
@@ -121,10 +85,17 @@ struct RuntimeConfiguration: Codable, Sendable {
             throw UserFacingError("`leaveAuditLogLookbackSeconds` must be greater than zero.")
         }
 
-        return RuntimeConfiguration(
+        return BotConfigurationFile(
+            applicationID: applicationID.trimmingCharacters(in: .whitespacesAndNewlines),
+            guildID: guildID.trimmingCharacters(in: .whitespacesAndNewlines),
+            defaultMemberRoleID: defaultMemberRoleID.trimmingCharacters(in: .whitespacesAndNewlines),
+            allowedStaffRoleIDs: allowedStaffRoleIDs.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty },
+            allowedConfigRoleIDs: allowedConfigRoleIDs.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty },
+            databasePath: databasePath.trimmingCharacters(in: .whitespacesAndNewlines),
             welcomeChannelID: Self.normalizedSnowflake(welcomeChannelID),
             leaveChannelID: Self.normalizedSnowflake(leaveChannelID),
             modLogChannelID: Self.normalizedSnowflake(modLogChannelID),
+            suggestionsChannelID: Self.normalizedSnowflake(suggestionsChannelID),
             warnUsersViaDM: warnUsersViaDM,
             welcomeMessage: welcomeMessage,
             voluntaryLeaveMessage: voluntaryLeaveMessage,
@@ -141,6 +112,21 @@ struct RuntimeConfiguration: Codable, Sendable {
 
     var warnings: [String] {
         var messages: [String] = []
+        if applicationID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            messages.append("Application ID is not configured yet.")
+        }
+        if guildID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            messages.append("Guild ID is not configured yet.")
+        }
+        if defaultMemberRoleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            messages.append("Default member role ID is not configured yet.")
+        }
+        if allowedStaffRoleIDs.isEmpty {
+            messages.append("No staff role IDs are configured yet.")
+        }
+        if allowedConfigRoleIDs.isEmpty {
+            messages.append("No config owner role IDs are configured yet.")
+        }
         if welcomeChannelID == nil {
             messages.append("Welcome channel is not configured yet. New-member welcome messages will be skipped.")
         }
@@ -150,6 +136,9 @@ struct RuntimeConfiguration: Codable, Sendable {
         if modLogChannelID == nil {
             messages.append("Mod log channel is not configured yet. Warning logging and some onboarding failure messages will be skipped.")
         }
+        if suggestionsChannelID == nil {
+            messages.append("Suggestions channel is not configured yet. Suggestions workflow will be unavailable until it is set.")
+        }
         return messages
     }
 
@@ -158,7 +147,7 @@ struct RuntimeConfiguration: Codable, Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(self)
         guard let string = String(data: data, encoding: .utf8) else {
-            throw UserFacingError("Failed to render runtime configuration.")
+            throw UserFacingError("Failed to render configuration.")
         }
         return string
     }
@@ -175,33 +164,31 @@ struct AppConfiguration: Sendable {
     // MARK: Stored Properties
 
     var botToken: String
-    var install: InstallConfiguration
-    var runtime: RuntimeConfiguration
+    var file: BotConfigurationFile
 
     // MARK: Accessors
 
-    var applicationID: String { install.applicationID }
-    var guildID: String { install.guildID }
-    var defaultMemberRoleID: String { install.defaultMemberRoleID }
-    var allowedStaffRoleIDs: [String] { install.allowedStaffRoleIDs }
-    var allowedConfigRoleIDs: [String] { install.allowedConfigRoleIDs }
-    var databasePath: String { install.databasePath }
-    var runtimeConfigPath: String { install.runtimeConfigPath }
-
-    var welcomeChannelID: String? { runtime.welcomeChannelID }
-    var leaveChannelID: String? { runtime.leaveChannelID }
-    var modLogChannelID: String? { runtime.modLogChannelID }
-    var warnUsersViaDM: Bool { runtime.warnUsersViaDM }
-    var welcomeMessage: String { runtime.welcomeMessage }
-    var voluntaryLeaveMessage: String { runtime.voluntaryLeaveMessage }
-    var kickMessage: String { runtime.kickMessage }
-    var banMessage: String { runtime.banMessage }
-    var unknownRemovalMessage: String { runtime.unknownRemovalMessage }
-    var roleAssignmentFailureMessage: String { runtime.roleAssignmentFailureMessage }
-    var warningDMTemplate: String { runtime.warningDMTemplate }
-    var triggerCooldownSeconds: Double { runtime.triggerCooldownSeconds }
-    var leaveAuditLogLookbackSeconds: Double { runtime.leaveAuditLogLookbackSeconds }
-    var iconicTriggers: [IconicTriggerConfiguration] { runtime.iconicTriggers }
+    var applicationID: String { file.applicationID }
+    var guildID: String { file.guildID }
+    var defaultMemberRoleID: String { file.defaultMemberRoleID }
+    var allowedStaffRoleIDs: [String] { file.allowedStaffRoleIDs }
+    var allowedConfigRoleIDs: [String] { file.allowedConfigRoleIDs }
+    var databasePath: String { file.databasePath }
+    var welcomeChannelID: String? { file.welcomeChannelID }
+    var leaveChannelID: String? { file.leaveChannelID }
+    var modLogChannelID: String? { file.modLogChannelID }
+    var suggestionsChannelID: String? { file.suggestionsChannelID }
+    var warnUsersViaDM: Bool { file.warnUsersViaDM }
+    var welcomeMessage: String { file.welcomeMessage }
+    var voluntaryLeaveMessage: String { file.voluntaryLeaveMessage }
+    var kickMessage: String { file.kickMessage }
+    var banMessage: String { file.banMessage }
+    var unknownRemovalMessage: String { file.unknownRemovalMessage }
+    var roleAssignmentFailureMessage: String { file.roleAssignmentFailureMessage }
+    var warningDMTemplate: String { file.warningDMTemplate }
+    var triggerCooldownSeconds: Double { file.triggerCooldownSeconds }
+    var leaveAuditLogLookbackSeconds: Double { file.leaveAuditLogLookbackSeconds }
+    var iconicTriggers: [IconicTriggerConfiguration] { file.iconicTriggers }
 
     var saySuccessMessage: String { "Sent." }
 
@@ -216,6 +203,7 @@ enum RuntimeConfigSetting: String, CaseIterable, Sendable {
     case welcomeChannelID = "welcome-channel-id"
     case leaveChannelID = "leave-channel-id"
     case modLogChannelID = "mod-log-channel-id"
+    case suggestionsChannelID = "suggestions-channel-id"
     case warnUsersViaDM = "warn-users-via-dm"
     case welcomeMessage = "welcome-message"
     case voluntaryLeaveMessage = "voluntary-leave-message"
@@ -236,102 +224,67 @@ actor ConfigurationStore {
     // MARK: Stored Properties
 
     private let botToken: String
-    private let install: InstallConfiguration
-    private let runtimeURL: URL
-    private var runtime: RuntimeConfiguration
+    private let configURL: URL
+    private var configurationFile: BotConfigurationFile
 
     // MARK: Lifecycle
 
-    init(botToken: String, install: InstallConfiguration, runtime: RuntimeConfiguration) {
+    init(botToken: String, configURL: URL, configurationFile: BotConfigurationFile) {
         self.botToken = botToken
-        self.install = install
-        self.runtime = runtime
-        self.runtimeURL = URL(fileURLWithPath: install.runtimeConfigPath)
+        self.configURL = configURL
+        self.configurationFile = configurationFile
     }
 
     // MARK: Loading
 
     static func load(from localConfigURL: URL?, environment: [String: String]) throws -> ConfigurationStore {
         let botToken = environment["DISCORD_BOT_TOKEN"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let configURL = localConfigURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("fizze-assistant.json")
 
-        var install = InstallConfiguration.defaults
-        if let localConfigURL {
-            let data = try Data(contentsOf: localConfigURL)
+        let configurationFile: BotConfigurationFile
+        if FileManager.default.fileExists(atPath: configURL.path) {
+            let data = try Data(contentsOf: configURL)
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
-            install = try decoder.decode(InstallConfiguration.self, from: data)
-        }
-
-        install.applicationID = environment["DISCORD_APPLICATION_ID"] ?? install.applicationID
-        install.guildID = environment["DISCORD_GUILD_ID"] ?? install.guildID
-        install.defaultMemberRoleID = environment["DISCORD_DEFAULT_MEMBER_ROLE_ID"] ?? install.defaultMemberRoleID
-        install.databasePath = environment["FIZZE_DATABASE_PATH"] ?? install.databasePath
-        install.runtimeConfigPath = environment["FIZZE_RUNTIME_CONFIG_PATH"] ?? install.runtimeConfigPath
-
-        if let allowed = environment["DISCORD_ALLOWED_STAFF_ROLE_IDS"], !allowed.isEmpty {
-            install.allowedStaffRoleIDs = allowed
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-        }
-
-        if let allowed = environment["DISCORD_ALLOWED_CONFIG_ROLE_IDS"], !allowed.isEmpty {
-            install.allowedConfigRoleIDs = allowed
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-        }
-
-        let runtimeURL = URL(fileURLWithPath: install.runtimeConfigPath)
-        let runtime: RuntimeConfiguration
-        if FileManager.default.fileExists(atPath: runtimeURL.path) {
-            let data = try Data(contentsOf: runtimeURL)
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            runtime = try decoder.decode(RuntimeConfiguration.self, from: data).validated()
+            configurationFile = try decoder.decode(BotConfigurationFile.self, from: data)
         } else {
-            runtime = try RuntimeConfiguration.defaults.validated()
+            configurationFile = .defaults
         }
 
-        return ConfigurationStore(botToken: botToken, install: install, runtime: runtime)
+        return ConfigurationStore(botToken: botToken, configURL: configURL, configurationFile: configurationFile)
     }
 
     // MARK: Accessors
 
     func currentConfiguration() -> AppConfiguration {
-        AppConfiguration(botToken: botToken, install: install, runtime: runtime)
+        AppConfiguration(botToken: botToken, file: configurationFile)
     }
 
     func readyConfiguration() throws -> AppConfiguration {
         AppConfiguration(
             botToken: botToken,
-            install: try install.readyForRuntime(botToken: botToken),
-            runtime: try runtime.validated()
+            file: try configurationFile.readyForRuntime(botToken: botToken)
         )
     }
 
-    func installConfiguration() -> InstallConfiguration {
-        install
+    func configurationFileContents() -> BotConfigurationFile {
+        configurationFile
     }
 
-    func runtimeConfiguration() -> RuntimeConfiguration {
-        runtime
-    }
-
-    // MARK: Runtime File Management
+    // MARK: File Management
 
     @discardableResult
-    func initializeRuntimeConfigurationFileIfNeeded() throws -> URL {
-        if FileManager.default.fileExists(atPath: runtimeURL.path) {
-            return runtimeURL
+    func initializeConfigurationFileIfNeeded() throws -> URL {
+        if FileManager.default.fileExists(atPath: configURL.path) {
+            return configURL
         }
 
-        try persist(runtimeConfiguration: runtime)
-        return runtimeURL
+        try persist(configurationFile: configurationFile)
+        return configURL
     }
 
-    func update(setting: RuntimeConfigSetting, value: String) throws -> RuntimeConfiguration {
-        var next = runtime
+    func update(setting: RuntimeConfigSetting, value: String) throws -> BotConfigurationFile {
+        var next = configurationFile
         switch setting {
         case .welcomeChannelID:
             next.welcomeChannelID = normalizeOptionalString(value)
@@ -339,6 +292,8 @@ actor ConfigurationStore {
             next.leaveChannelID = normalizeOptionalString(value)
         case .modLogChannelID:
             next.modLogChannelID = normalizeOptionalString(value)
+        case .suggestionsChannelID:
+            next.suggestionsChannelID = normalizeOptionalString(value)
         case .warnUsersViaDM:
             guard let parsed = Bool(value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
                 throw UserFacingError("`\(setting.rawValue)` expects `true` or `false`.")
@@ -370,30 +325,30 @@ actor ConfigurationStore {
             next.leaveAuditLogLookbackSeconds = parsed
         }
 
-        runtime = try next.validated()
-        try persist(runtimeConfiguration: runtime)
-        return runtime
+        configurationFile = try next.readyForRuntime(botToken: botToken.isEmpty ? "placeholder-token" : botToken)
+        try persist(configurationFile: configurationFile)
+        return configurationFile
     }
 
-    func addTrigger(trigger: String, response: String) throws -> RuntimeConfiguration {
+    func addTrigger(trigger: String, response: String) throws -> BotConfigurationFile {
         let normalizedTrigger = try normalizedRequiredString(trigger, name: "trigger")
         let normalizedResponse = try normalizedRequiredString(response, name: "response")
 
-        var next = runtime
+        var next = configurationFile
         if let index = next.iconicTriggers.firstIndex(where: { $0.trigger.caseInsensitiveCompare(normalizedTrigger) == .orderedSame }) {
             next.iconicTriggers[index] = IconicTriggerConfiguration(trigger: normalizedTrigger, response: normalizedResponse)
         } else {
             next.iconicTriggers.append(IconicTriggerConfiguration(trigger: normalizedTrigger, response: normalizedResponse))
         }
 
-        runtime = try next.validated()
-        try persist(runtimeConfiguration: runtime)
-        return runtime
+        configurationFile = try next.readyForRuntime(botToken: botToken.isEmpty ? "placeholder-token" : botToken)
+        try persist(configurationFile: configurationFile)
+        return configurationFile
     }
 
     func removeTrigger(trigger: String) throws -> Bool {
         let normalizedTrigger = try normalizedRequiredString(trigger, name: "trigger")
-        var next = runtime
+        var next = configurationFile
         let originalCount = next.iconicTriggers.count
         next.iconicTriggers.removeAll { $0.trigger.caseInsensitiveCompare(normalizedTrigger) == .orderedSame }
 
@@ -401,28 +356,28 @@ actor ConfigurationStore {
             return false
         }
 
-        runtime = try next.validated()
-        try persist(runtimeConfiguration: runtime)
+        configurationFile = try next.readyForRuntime(botToken: botToken.isEmpty ? "placeholder-token" : botToken)
+        try persist(configurationFile: configurationFile)
         return true
     }
 
     // MARK: Helpers
 
-    private func persist(runtimeConfiguration: RuntimeConfiguration) throws {
-        let directoryURL = runtimeURL.deletingLastPathComponent()
+    private func persist(configurationFile: BotConfigurationFile) throws {
+        let directoryURL = configURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(runtimeConfiguration)
+        let data = try encoder.encode(configurationFile)
 
         let temporaryURL = directoryURL.appendingPathComponent(UUID().uuidString).appendingPathExtension("tmp")
         try data.write(to: temporaryURL, options: .atomic)
 
-        if FileManager.default.fileExists(atPath: runtimeURL.path) {
-            try FileManager.default.removeItem(at: runtimeURL)
+        if FileManager.default.fileExists(atPath: configURL.path) {
+            try FileManager.default.removeItem(at: configURL)
         }
-        try FileManager.default.moveItem(at: temporaryURL, to: runtimeURL)
+        try FileManager.default.moveItem(at: temporaryURL, to: configURL)
     }
 
     private func normalizedRequiredString(_ value: String, name: String) throws -> String {

@@ -70,7 +70,7 @@ struct CheckCommand: AsyncParsableCommand {
 struct ConfigCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "config",
-        abstract: "Manage the local runtime configuration file.",
+        abstract: "Manage the committed non-secret JSON configuration file.",
         subcommands: [
             ConfigShowCommand.self,
             ConfigInitCommand.self,
@@ -82,7 +82,7 @@ struct ConfigCommand: AsyncParsableCommand {
 struct ConfigShowCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "show",
-        abstract: "Print the current runtime configuration."
+        abstract: "Print the current non-secret configuration."
     )
 
     @OptionGroup
@@ -96,7 +96,7 @@ struct ConfigShowCommand: AsyncParsableCommand {
 struct ConfigInitCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "init",
-        abstract: "Create the runtime configuration file if it does not exist."
+        abstract: "Create the JSON configuration file if it does not exist."
     )
 
     @OptionGroup
@@ -110,7 +110,7 @@ struct ConfigInitCommand: AsyncParsableCommand {
 struct ConfigValidateCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "validate",
-        abstract: "Validate the local and runtime configuration setup."
+        abstract: "Validate the non-secret configuration setup."
     )
 
     @OptionGroup

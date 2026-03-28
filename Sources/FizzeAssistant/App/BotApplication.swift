@@ -26,30 +26,21 @@ enum BotApplication {
         )
         switch command {
         case .configShow:
-            let runtime = await configurationStore.runtimeConfiguration()
-            print(try runtime.prettyPrintedJSON())
+            let configurationFile = await configurationStore.configurationFileContents()
+            print(try configurationFile.prettyPrintedJSON())
 
         case .configInit:
-            let url = try await configurationStore.initializeRuntimeConfigurationFileIfNeeded()
-            print("Runtime configuration is available at \(url.path)")
+            let url = try await configurationStore.initializeConfigurationFileIfNeeded()
+            print("Configuration is available at \(url.path)")
 
         case .configValidate:
-            let runtime = await configurationStore.runtimeConfiguration()
-            let install = await configurationStore.installConfiguration()
-            print("Runtime configuration path: \(install.runtimeConfigPath)")
-            if install.setupWarnings.isEmpty {
-                print("Install configuration is ready for runtime use.")
+            let configurationFile = await configurationStore.configurationFileContents()
+            print("Configuration path: \(options.config ?? "fizze-assistant.json")")
+            if configurationFile.warnings.isEmpty {
+                print("Configuration is ready for runtime use.")
             } else {
-                print("Install configuration warnings:")
-                for warning in install.setupWarnings {
-                    print("- \(warning)")
-                }
-            }
-            if runtime.warnings.isEmpty {
-                print("Runtime configuration is valid.")
-            } else {
-                print("Runtime configuration warnings:")
-                for warning in runtime.warnings {
+                print("Configuration warnings:")
+                for warning in configurationFile.warnings {
                     print("- \(warning)")
                 }
             }

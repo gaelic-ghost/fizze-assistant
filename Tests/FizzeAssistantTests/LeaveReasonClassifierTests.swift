@@ -10,16 +10,29 @@ struct LeaveReasonClassifierTests {
 
         let configuration = AppConfiguration(
             botToken: "token",
-            install: InstallConfiguration(
+            file: BotConfigurationFile(
                 applicationID: "app",
                 guildID: "guild",
                 defaultMemberRoleID: "member",
                 allowedStaffRoleIDs: ["staff"],
                 allowedConfigRoleIDs: ["owner"],
                 databasePath: ".data/test.sqlite",
-                runtimeConfigPath: ".data/runtime.json"
+                welcomeChannelID: nil,
+                leaveChannelID: nil,
+                modLogChannelID: nil,
+                suggestionsChannelID: nil,
+                warnUsersViaDM: false,
+                welcomeMessage: "Welcome",
+                voluntaryLeaveMessage: "Leave",
+                kickMessage: "Kick",
+                banMessage: "Ban",
+                unknownRemovalMessage: "Unknown",
+                roleAssignmentFailureMessage: "Role failure",
+                warningDMTemplate: "Warn",
+                triggerCooldownSeconds: 30,
+                leaveAuditLogLookbackSeconds: 30,
+                iconicTriggers: []
             ),
-            runtime: .defaults
         )
 
         let restClient = DiscordRESTClient(token: "token", logger: .init(label: "test"))

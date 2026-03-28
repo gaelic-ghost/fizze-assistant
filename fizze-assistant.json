@@ -1,7 +1,19 @@
 {
-  "welcomeChannelID": "WELCOME_CHANNEL_ID",
-  "leaveChannelID": "LEAVE_CHANNEL_ID",
-  "modLogChannelID": "MOD_LOG_CHANNEL_ID",
+  "applicationID": "1487254261594325043",
+  "guildID": "811973007467610113",
+  "defaultMemberRoleID": "811980557814595604",
+  "allowedStaffRoleIDs": [
+    "811980472829083698",
+    "838539683541418025"
+  ],
+  "allowedConfigRoleIDs": [
+    "1457929935355248661"
+  ],
+  "databasePath": ".data/fizze-assistant.sqlite",
+  "welcomeChannelID": "819618899435585577",
+  "leaveChannelID": "819618899435585577",
+  "modLogChannelID": "819616753301585940",
+  "suggestionsChannelID": null,
   "warnUsersViaDM": false,
   "welcomeMessage": "Welcome to the server, {user_mention}!",
   "voluntaryLeaveMessage": "{username} left the server.",
@@ -12,10 +24,5 @@
   "warningDMTemplate": "You have been warned in {guild_name}: {reason}",
   "triggerCooldownSeconds": 30,
   "leaveAuditLogLookbackSeconds": 30,
-  "iconicTriggers": [
-    {
-      "trigger": "fizze time",
-      "response": "sparkle mode engaged"
-    }
-  ]
+  "iconicTriggers": []
 }

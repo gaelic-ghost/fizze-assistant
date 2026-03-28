@@ -4,8 +4,7 @@ set -eu
 
 REPO_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 ENV_FILE="${ENV_FILE:-$REPO_DIR/.env.local}"
-CONFIG_FILE="${CONFIG_FILE:-$REPO_DIR/fizze-assistant.local.json}"
-RUNTIME_CONFIG_FILE="${RUNTIME_CONFIG_FILE:-$REPO_DIR/.data/runtime-config.json}"
+CONFIG_FILE="${CONFIG_FILE:-$REPO_DIR/fizze-assistant.json}"
 BINARY_PATH="${BINARY_PATH:-$REPO_DIR/.build/release/fizze-assistant}"
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -23,23 +22,16 @@ if [ -z "${DISCORD_BOT_TOKEN:-}" ]; then
 fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
-  echo "Missing install config: $CONFIG_FILE" >&2
-  echo "Copy fizze-assistant.example.json to fizze-assistant.local.json and fill in the real IDs." >&2
+  echo "Missing configuration file: $CONFIG_FILE" >&2
+  echo "Expected the committed non-secret config file at fizze-assistant.json." >&2
   exit 1
 fi
-
-mkdir -p "$(dirname -- "$RUNTIME_CONFIG_FILE")"
 
 cd "$REPO_DIR"
 
 if [ ! -x "$BINARY_PATH" ]; then
   echo "Release binary not found. Building..."
   swift build -c release
-fi
-
-if [ ! -f "$RUNTIME_CONFIG_FILE" ]; then
-  echo "Initializing runtime config at $RUNTIME_CONFIG_FILE"
-  "$BINARY_PATH" config init --config "$CONFIG_FILE"
 fi
 
 echo "Validating bot configuration..."

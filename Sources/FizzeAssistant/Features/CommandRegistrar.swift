@@ -47,13 +47,13 @@ struct CommandRegistrar {
             ),
             DiscordSlashCommand(
                 name: "config",
-                description: "View or adjust the bot's runtime configuration.",
+                description: "View or adjust the bot's non-secret configuration.",
                 options: [
-                    DiscordApplicationCommandOption(type: 1, name: "show", description: "Show the current runtime configuration.", required: nil, channelTypes: nil, options: nil),
+                    DiscordApplicationCommandOption(type: 1, name: "show", description: "Show the current non-secret configuration.", required: nil, channelTypes: nil, options: nil),
                     DiscordApplicationCommandOption(
                         type: 1,
                         name: "set",
-                        description: "Set one runtime configuration value.",
+                        description: "Set one non-secret configuration value.",
                         required: nil,
                         channelTypes: nil,
                         options: [
