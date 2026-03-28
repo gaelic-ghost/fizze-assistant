@@ -31,9 +31,9 @@ actor DiscordGatewayClient {
     private var heartbeatTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
     private var sequenceNumber: Int?
-    private var sessionID: String?
+    private var session_id: String?
     private var resumeURL: URL?
-    private var heartbeatIntervalNanoseconds: UInt64 = 30_000_000_000
+    private var heartbeat_interval_nanoseconds: UInt64 = 30_000_000_000
     private var awaitingHeartbeatACK = false
     private var isRunning = false
     private var isReconnecting = false
@@ -152,7 +152,7 @@ actor DiscordGatewayClient {
 
         switch envelope.op {
         case DiscordGatewayOpCode.hello:
-            heartbeatIntervalNanoseconds = try parseHeartbeatInterval(from: envelope.d)
+            heartbeat_interval_nanoseconds = try parseHeartbeatInterval(from: envelope.d)
             heartbeatTask?.cancel()
             heartbeatTask = Task { [weak self] in
                 await self?.heartbeatLoop()
@@ -166,7 +166,7 @@ actor DiscordGatewayClient {
             await reconnect()
 
         case DiscordGatewayOpCode.invalidSession:
-            sessionID = nil
+            session_id = nil
             resumeURL = nil
             await reconnect()
 
@@ -193,7 +193,7 @@ actor DiscordGatewayClient {
                     "d": sequenceNumber.map { .number(Double($0)) } ?? .null,
                 ])
 
-                try await Task.sleep(nanoseconds: heartbeatIntervalNanoseconds)
+                try await Task.sleep(nanoseconds: heartbeat_interval_nanoseconds)
             } catch is CancellationError {
                 return
             } catch {
@@ -205,13 +205,13 @@ actor DiscordGatewayClient {
     }
 
     private func sendIdentifyOrResume() async throws {
-        if let sessionID, let resumeURL {
+        if let session_id, let resumeURL {
             self.resumeURL = resumeURL
             try await send(payload: [
                 "op": .number(Double(DiscordGatewayOpCode.resume)),
                 "d": .object([
                     "token": .string(token),
-                    "session_id": .string(sessionID),
+                    "session_id": .string(session_id),
                     "seq": sequenceNumber.map { .number(Double($0)) } ?? .null,
                 ]),
             ])
@@ -244,8 +244,8 @@ actor DiscordGatewayClient {
         switch eventName {
         case "READY":
             let ready = try parseReadyPayload(from: payload)
-            sessionID = ready.sessionID
-            resumeURL = URL(string: "\(ready.resumeGatewayURL)?v=10&encoding=json")
+            session_id = ready.session_id
+            resumeURL = URL(string: "\(ready.resume_gateway_url)?v=10&encoding=json")
 
         case "GUILD_MEMBER_ADD":
             let event = try decodePayload(DiscordGuildMemberAddEvent.self, from: payload)
@@ -285,7 +285,7 @@ actor DiscordGatewayClient {
             throw GatewayError.missingPayload
         }
 
-        guard let heartbeatValue = object["heartbeat_interval"] ?? object["heartbeatInterval"] else {
+        guard let heartbeatValue = object["heartbeat_interval"] else {
             throw GatewayError.missingHeartbeatInterval
         }
 
@@ -307,15 +307,15 @@ actor DiscordGatewayClient {
             throw GatewayError.missingPayload
         }
 
-        guard let sessionID = stringValue(from: object["session_id"] ?? object["sessionId"]) else {
+        guard let session_id = stringValue(from: object["session_id"]) else {
             throw GatewayError.missingSessionID
         }
 
-        guard let resumeGatewayURL = stringValue(from: object["resume_gateway_url"] ?? object["resumeGatewayUrl"]) else {
+        guard let resume_gateway_url = stringValue(from: object["resume_gateway_url"]) else {
             throw GatewayError.missingResumeGatewayURL
         }
 
-        return DiscordGatewayReady(sessionID: sessionID, resumeGatewayURL: resumeGatewayURL)
+        return DiscordGatewayReady(session_id: session_id, resume_gateway_url: resume_gateway_url)
     }
 
     private func stringValue(from value: JSONValue?) -> String? {

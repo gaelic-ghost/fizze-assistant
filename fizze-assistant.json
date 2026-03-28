@@ -1,28 +1,28 @@
 {
-  "applicationID": "1487254261594325043",
-  "guildID": "811973007467610113",
-  "defaultMemberRoleID": "811980557814595604",
-  "allowedStaffRoleIDs": [
+  "application_id": "1487254261594325043",
+  "guild_id": "811973007467610113",
+  "default_member_role_id": "811980557814595604",
+  "allowed_staff_role_ids": [
     "811980472829083698",
     "838539683541418025"
   ],
-  "allowedConfigRoleIDs": [
+  "allowed_config_role_ids": [
     "1457929935355248661"
   ],
-  "databasePath": ".data/fizze-assistant.sqlite",
-  "welcomeChannelID": "819618899435585577",
-  "leaveChannelID": "819618899435585577",
-  "modLogChannelID": "819616753301585940",
-  "suggestionsChannelID": "1486722375616561202",
-  "warnUsersViaDM": false,
-  "welcomeMessage": "Welcome to the server, {user_mention}!",
-  "voluntaryLeaveMessage": "{username} left the server.",
-  "kickMessage": "{username} was kicked from the server.",
-  "banMessage": "{username} was banned from the server.",
-  "unknownRemovalMessage": "{username} left or was removed from the server.",
-  "roleAssignmentFailureMessage": "I couldn't assign the default member role to {user_mention}. Please check role hierarchy and Manage Roles permissions.",
-  "warningDMTemplate": "You have been warned in {guild_name}: {reason}",
-  "triggerCooldownSeconds": 30,
-  "leaveAuditLogLookbackSeconds": 30,
-  "iconicTriggers": []
+  "database_path": ".data/fizze-assistant.sqlite",
+  "welcome_channel_id": "819618899435585577",
+  "leave_channel_id": "819618899435585577",
+  "mod_log_channel_id": "819616753301585940",
+  "suggestions_channel_id": "1486722375616561202",
+  "warn_users_via_dm": false,
+  "welcome_message": "Welcome to the server, {user_mention}!",
+  "voluntary_leave_message": "{username} left the server.",
+  "kick_message": "{username} was kicked from the server.",
+  "ban_message": "{username} was banned from the server.",
+  "unknown_removal_message": "{username} left or was removed from the server.",
+  "role_assignment_failure_message": "I couldn't assign the default member role to {user_mention}. Please check role hierarchy and Manage Roles permissions.",
+  "warning_dm_template": "You have been warned in {guild_name}: {reason}",
+  "trigger_cooldown_seconds": 30,
+  "leave_audit_log_lookback_seconds": 30,
+  "iconic_triggers": []
 }

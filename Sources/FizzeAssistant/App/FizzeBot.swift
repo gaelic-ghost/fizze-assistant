@@ -22,10 +22,10 @@ actor FizzeBot {
         self.restClient = restClient
         self.logger = logger
         let configuration = await configurationStore.currentConfiguration()
-        self.warningStore = try WarningStore(path: configuration.databasePath)
+        self.warningStore = try WarningStore(path: configuration.database_path)
         self.botUserID = try await restClient.getCurrentUser().id
 
-        let guild = try await restClient.getGuild(id: configuration.guildID)
+        let guild = try await restClient.getGuild(id: configuration.guild_id)
         self.guildName = guild.name
     }
 
@@ -95,25 +95,25 @@ actor FizzeBot {
         do {
             try await restClient.addRole(
                 to: event.user.id,
-                guildID: configuration.guildID,
-                roleID: configuration.defaultMemberRoleID
+                guild_id: configuration.guild_id,
+                role_id: configuration.default_member_role_id
             )
         } catch {
-            let message = TemplateRenderer.render(configuration.roleAssignmentFailureMessage, user: event.user, guildName: guildName)
-            if let modLogChannelID = configuration.modLogChannelID {
-                try? await restClient.createMessage(channelID: modLogChannelID, content: message)
+            let message = TemplateRenderer.render(configuration.role_assignment_failure_message, user: event.user, guildName: guildName)
+            if let mod_log_channel_id = configuration.mod_log_channel_id {
+                try? await restClient.createMessage(channel_id: mod_log_channel_id, content: message)
             } else {
                 logger.warning("Mod log channel is not configured; skipping role assignment failure message.")
             }
             throw error
         }
 
-        let welcome = TemplateRenderer.render(configuration.welcomeMessage, user: event.user, guildName: guildName)
-        guard let welcomeChannelID = configuration.welcomeChannelID else {
+        let welcome = TemplateRenderer.render(configuration.welcome_message, user: event.user, guildName: guildName)
+        guard let welcome_channel_id = configuration.welcome_channel_id else {
             logger.warning("Welcome channel is not configured; skipping welcome message.")
             return
         }
-        try await restClient.createMessage(channelID: welcomeChannelID, content: welcome)
+        try await restClient.createMessage(channel_id: welcome_channel_id, content: welcome)
     }
 
     private func handleMemberRemoved(_ event: DiscordGuildMemberRemoveEvent) async throws {
@@ -125,7 +125,7 @@ actor FizzeBot {
         )
         let reason: LeaveReason
         do {
-            reason = try await classifier.classify(userID: event.user.id)
+            reason = try await classifier.classify(user_id: event.user.id)
         } catch {
             logger.warning("Failed to classify member removal; using unknown fallback.", metadata: ["error": .string(String(describing: error))])
             reason = .unknown
@@ -134,36 +134,36 @@ actor FizzeBot {
         let template: String
         switch reason {
         case .voluntary:
-            template = configuration.voluntaryLeaveMessage
+            template = configuration.voluntary_leave_message
         case .kicked:
-            template = configuration.kickMessage
+            template = configuration.kick_message
         case .banned:
-            template = configuration.banMessage
+            template = configuration.ban_message
         case .unknown:
-            template = configuration.unknownRemovalMessage
+            template = configuration.unknown_removal_message
         }
 
         let announcement = TemplateRenderer.render(template, user: event.user, guildName: guildName)
-        guard let leaveChannelID = configuration.leaveChannelID else {
+        guard let leave_channel_id = configuration.leave_channel_id else {
             logger.warning("Leave channel is not configured; skipping leave announcement.")
             return
         }
-        try await restClient.createMessage(channelID: leaveChannelID, content: announcement)
+        try await restClient.createMessage(channel_id: leave_channel_id, content: announcement)
     }
 
     private func handleMessageCreate(_ event: DiscordMessageEvent) async throws {
         let configuration = await configurationStore.currentConfiguration()
-        guard event.guildID == configuration.guildID else { return }
-        guard event.webhookID == nil else { return }
+        guard event.guild_id == configuration.guild_id else { return }
+        guard event.webhook_id == nil else { return }
         guard event.author.id != botUserID else { return }
 
         let engine = IconicResponseEngine(
-            triggers: configuration.iconicTriggers,
+            triggers: configuration.iconic_triggers,
             cooldownStore: cooldownStore,
-            cooldown: configuration.triggerCooldownSeconds
+            cooldown: configuration.trigger_cooldown_seconds
         )
         if let response = await engine.response(for: event.content) {
-            try await restClient.createMessage(channelID: event.channelID, content: response)
+            try await restClient.createMessage(channel_id: event.channel_id, content: response)
         }
     }
 }

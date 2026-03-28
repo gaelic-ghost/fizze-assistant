@@ -10,7 +10,7 @@ struct DiscordInteractionMemberTests {
           "user": {
             "id": "user-1",
             "username": "gale",
-            "globalName": "Gale"
+            "global_name": "Gale"
           },
           "roles": ["staff-role"],
           "permissions": "40"

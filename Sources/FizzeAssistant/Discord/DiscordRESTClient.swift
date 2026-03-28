@@ -23,13 +23,8 @@ struct DiscordRESTClient {
         self.logger = logger
         self.session = URLSession(configuration: .ephemeral)
 
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        self.encoder = encoder
-
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        self.decoder = decoder
+        self.encoder = JSONEncoder()
+        self.decoder = JSONDecoder()
     }
 
     // MARK: REST Helpers
@@ -50,46 +45,46 @@ struct DiscordRESTClient {
         try await request(path: "/channels/\(id)", method: "GET")
     }
 
-    func getGuildRoles(guildID: DiscordSnowflake) async throws -> [DiscordRole] {
-        try await request(path: "/guilds/\(guildID)/roles", method: "GET")
+    func getGuildRoles(guild_id: DiscordSnowflake) async throws -> [DiscordRole] {
+        try await request(path: "/guilds/\(guild_id)/roles", method: "GET")
     }
 
-    func getGuildMember(guildID: DiscordSnowflake, userID: DiscordSnowflake) async throws -> DiscordMember {
-        try await request(path: "/guilds/\(guildID)/members/\(userID)", method: "GET")
+    func getGuildMember(guild_id: DiscordSnowflake, user_id: DiscordSnowflake) async throws -> DiscordMember {
+        try await request(path: "/guilds/\(guild_id)/members/\(user_id)", method: "GET")
     }
 
-    func addRole(to userID: DiscordSnowflake, guildID: DiscordSnowflake, roleID: DiscordSnowflake) async throws {
-        _ = try await emptyRequest(path: "/guilds/\(guildID)/members/\(userID)/roles/\(roleID)", method: "PUT")
+    func addRole(to user_id: DiscordSnowflake, guild_id: DiscordSnowflake, role_id: DiscordSnowflake) async throws {
+        _ = try await emptyRequest(path: "/guilds/\(guild_id)/members/\(user_id)/roles/\(role_id)", method: "PUT")
     }
 
-    func createMessage(channelID: DiscordSnowflake, content: String, flags: Int? = nil) async throws {
+    func createMessage(channel_id: DiscordSnowflake, content: String, flags: Int? = nil) async throws {
         let payload = DiscordMessageCreate(content: content, flags: flags)
-        _ = try await emptyRequest(path: "/channels/\(channelID)/messages", method: "POST", body: payload)
+        _ = try await emptyRequest(path: "/channels/\(channel_id)/messages", method: "POST", body: payload)
     }
 
-    func createDMChannel(recipientID: DiscordSnowflake) async throws -> DiscordChannel {
-        try await request(path: "/users/@me/channels", method: "POST", body: DiscordCreateDMRequest(recipientID: recipientID))
+    func createDMChannel(recipient_id: DiscordSnowflake) async throws -> DiscordChannel {
+        try await request(path: "/users/@me/channels", method: "POST", body: DiscordCreateDMRequest(recipient_id: recipient_id))
     }
 
-    func upsertGuildCommands(applicationID: DiscordSnowflake, guildID: DiscordSnowflake, commands: [DiscordSlashCommand]) async throws {
-        _ = try await emptyRequest(path: "/applications/\(applicationID)/guilds/\(guildID)/commands", method: "PUT", body: commands)
+    func upsertGuildCommands(application_id: DiscordSnowflake, guild_id: DiscordSnowflake, commands: [DiscordSlashCommand]) async throws {
+        _ = try await emptyRequest(path: "/applications/\(application_id)/guilds/\(guild_id)/commands", method: "PUT", body: commands)
     }
 
-    func createInteractionResponse(interactionID: DiscordSnowflake, token: String, payload: InteractionCallbackPayload) async throws {
-        let path = "/interactions/\(interactionID)/\(token)/callback"
+    func createInteractionResponse(interaction_id: DiscordSnowflake, token: String, payload: InteractionCallbackPayload) async throws {
+        let path = "/interactions/\(interaction_id)/\(token)/callback"
         _ = try await emptyRequest(path: path, method: "POST", body: payload, requiresBotAuthorization: false)
     }
 
-    func getAuditLogEntries(guildID: DiscordSnowflake, actionType: Int, limit: Int = 10) async throws -> [DiscordAuditLogEntry] {
+    func getAuditLogEntries(guild_id: DiscordSnowflake, action_type: Int, limit: Int = 10) async throws -> [DiscordAuditLogEntry] {
         let response: DiscordAuditLogResponse = try await request(
-            path: "/guilds/\(guildID)/audit-logs",
+            path: "/guilds/\(guild_id)/audit-logs",
             method: "GET",
             queryItems: [
-                URLQueryItem(name: "action_type", value: String(actionType)),
+                URLQueryItem(name: "action_type", value: String(action_type)),
                 URLQueryItem(name: "limit", value: String(limit)),
             ]
         )
-        return response.auditLogEntries
+        return response.audit_log_entries
     }
 
     // MARK: Low-Level Requests

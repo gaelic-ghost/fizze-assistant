@@ -30,49 +30,49 @@ actor InteractionHandler {
             switch data.name {
             case "say":
                 try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
-                let channelID = try requireOption(named: "channel", from: data).stringValueRequired
+                let channel_id = try requireOption(named: "channel", from: data).stringValueRequired
                 let message = try requireOption(named: "message", from: data).stringValueRequired
-                try await restClient.createMessage(channelID: channelID, content: message)
-                try await respond(interaction, content: configuration.saySuccessMessage, ephemeral: true)
+                try await restClient.createMessage(channel_id: channel_id, content: message)
+                try await respond(interaction, content: configuration.say_success_message, ephemeral: true)
 
             case "warn":
                 try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
-                guard let modLogChannelID = configuration.modLogChannelID else {
+                guard let mod_log_channel_id = configuration.mod_log_channel_id else {
                     throw UserFacingError("The mod log channel is not configured yet.")
                 }
-                let userID = try requireOption(named: "user", from: data).stringValueRequired
+                let user_id = try requireOption(named: "user", from: data).stringValueRequired
                 let reason = try requireOption(named: "reason", from: data).stringValueRequired
-                let moderatorID = interaction.member?.user?.id ?? "unknown"
+                let moderator_id = interaction.member?.user?.id ?? "unknown"
                 let warning = try await warningStore.createWarning(
-                    guildID: configuration.guildID,
-                    userID: userID,
-                    moderatorUserID: moderatorID,
+                    guild_id: configuration.guild_id,
+                    user_id: user_id,
+                    moderator_user_id: moderator_id,
                     reason: reason
                 )
                 try await restClient.createMessage(
-                    channelID: modLogChannelID,
-                    content: "Warning \(warning.id) recorded for <@\(userID)> by <@\(moderatorID)>: \(reason)"
+                    channel_id: mod_log_channel_id,
+                    content: "Warning \(warning.id) recorded for <@\(user_id)> by <@\(moderator_id)>: \(reason)"
                 )
-                if configuration.warnUsersViaDM {
-                    let dmChannel = try await restClient.createDMChannel(recipientID: userID)
-                    let dmMessage = configuration.warningDMTemplate
+                if configuration.warn_users_via_dm {
+                    let dmChannel = try await restClient.createDMChannel(recipient_id: user_id)
+                    let dmMessage = configuration.warning_dm_template
                         .replacingOccurrences(of: "{reason}", with: reason)
                         .replacingOccurrences(of: "{guild_name}", with: guildName)
-                    try await restClient.createMessage(channelID: dmChannel.id, content: dmMessage)
+                    try await restClient.createMessage(channel_id: dmChannel.id, content: dmMessage)
                 }
                 try await respond(interaction, content: "Warning recorded as `\(warning.id)`.", ephemeral: true)
 
             case "warns":
                 try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
-                let userID = try requireOption(named: "user", from: data).stringValueRequired
-                let warnings = try await warningStore.warnings(for: userID, guildID: configuration.guildID)
+                let user_id = try requireOption(named: "user", from: data).stringValueRequired
+                let warnings = try await warningStore.warnings(for: user_id, guild_id: configuration.guild_id)
                 let content: String
                 if warnings.isEmpty {
-                    content = "No warnings recorded for <@\(userID)>."
+                    content = "No warnings recorded for <@\(user_id)>."
                 } else {
                     content = warnings.map { warning in
-                        let timestamp = ISO8601DateFormatter().string(from: warning.createdAt)
-                        return "`\(warning.id)` • \(timestamp) • <@\(warning.moderatorUserID)> • \(warning.reason)"
+                        let timestamp = ISO8601DateFormatter().string(from: warning.created_at)
+                        return "`\(warning.id)` • \(timestamp) • <@\(warning.moderator_user_id)> • \(warning.reason)"
                     }.joined(separator: "\n")
                 }
                 try await respond(interaction, content: content, ephemeral: true)
@@ -85,9 +85,9 @@ actor InteractionHandler {
 
             case "clear-warnings":
                 try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
-                let userID = try requireOption(named: "user", from: data).stringValueRequired
-                let deleted = try await warningStore.deleteWarnings(for: userID, guildID: configuration.guildID)
-                try await respond(interaction, content: "Deleted \(deleted) warnings for <@\(userID)>.", ephemeral: true)
+                let user_id = try requireOption(named: "user", from: data).stringValueRequired
+                let deleted = try await warningStore.deleteWarnings(for: user_id, guild_id: configuration.guild_id)
+                try await respond(interaction, content: "Deleted \(deleted) warnings for <@\(user_id)>.", ephemeral: true)
 
             case "config":
                 try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
@@ -112,7 +112,7 @@ actor InteractionHandler {
             data: DiscordMessageCreate(content: content, flags: ephemeral ? 64 : nil)
         )
         try await restClient.createInteractionResponse(
-            interactionID: interaction.id,
+            interaction_id: interaction.id,
             token: interaction.token,
             payload: payload
         )
@@ -179,10 +179,10 @@ actor InteractionHandler {
         case "trigger-list":
             let runtime = await configurationStore.configurationFileContents()
             let content: String
-            if runtime.iconicTriggers.isEmpty {
+            if runtime.iconic_triggers.isEmpty {
                 content = "No exact-match triggers are configured."
             } else {
-                content = runtime.iconicTriggers.map { "`\($0.trigger)` -> \($0.response)" }.joined(separator: "\n")
+                content = runtime.iconic_triggers.map { "`\($0.trigger)` -> \($0.response)" }.joined(separator: "\n")
             }
             try await respond(interaction, content: content, ephemeral: true)
 
@@ -205,11 +205,11 @@ private extension JSONValue {
 
 private extension DiscordInteractionMember {
     func isStaffAuthorized(for configuration: AppConfiguration) -> Bool {
-        hasServerManagementPrivileges || !Set(roles).isDisjoint(with: configuration.allowedStaffRoleIDs)
+        hasServerManagementPrivileges || !Set(roles).isDisjoint(with: configuration.allowed_staff_role_ids)
     }
 
     func isConfigAuthorized(for configuration: AppConfiguration) -> Bool {
-        hasServerManagementPrivileges || !Set(roles).isDisjoint(with: configuration.allowedConfigRoleIDs)
+        hasServerManagementPrivileges || !Set(roles).isDisjoint(with: configuration.allowed_config_role_ids)
     }
 
     var hasServerManagementPrivileges: Bool {

@@ -56,7 +56,7 @@ enum BotApplication {
         case .registerCommands:
             let registrar = CommandRegistrar(restClient: restClient, configuration: configuration, logger: configuredLogger)
             try await registrar.registerGuildCommands()
-            configuredLogger.info("Registered guild commands.", metadata: ["guild_id": .string(configuration.guildID)])
+            configuredLogger.info("Registered guild commands.", metadata: ["guild_id": .string(configuration.guild_id)])
 
         case .check:
             let report = try await PermissionReportBuilder(

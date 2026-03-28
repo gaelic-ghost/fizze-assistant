@@ -11,13 +11,13 @@ struct WarningStoreTests {
 
         let store = try WarningStore(path: databaseURL.path)
         let warning = try await store.createWarning(
-            guildID: "guild",
-            userID: "user",
-            moderatorUserID: "mod",
+            guild_id: "guild",
+            user_id: "user",
+            moderator_user_id: "mod",
             reason: "Reason"
         )
 
-        let warnings = try await store.warnings(for: "user", guildID: "guild")
+        let warnings = try await store.warnings(for: "user", guild_id: "guild")
         #expect(warnings.count == 1)
         #expect(warnings.first?.id == warning.id)
 

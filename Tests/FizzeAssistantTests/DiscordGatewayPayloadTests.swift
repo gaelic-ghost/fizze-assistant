@@ -5,9 +5,6 @@ import Testing
 struct DiscordGatewayPayloadTests {
     @Test
     func helloPayloadDecodesHeartbeatIntervalFromGatewayEnvelope() throws {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-
         let data = """
         {
           "op": 10,
@@ -19,7 +16,7 @@ struct DiscordGatewayPayloadTests {
         }
         """.data(using: .utf8)!
 
-        let envelope = try decoder.decode(DiscordGatewayEnvelope.self, from: data)
+        let envelope = try JSONDecoder().decode(DiscordGatewayEnvelope.self, from: data)
 
         guard case let .object(payload)? = envelope.d else {
             Issue.record("Expected hello payload object.")
@@ -37,9 +34,6 @@ struct DiscordGatewayPayloadTests {
 
     @Test
     func readyPayloadContainsSessionAndResumeURL() throws {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-
         let data = """
         {
           "op": 0,
@@ -52,33 +46,30 @@ struct DiscordGatewayPayloadTests {
         }
         """.data(using: .utf8)!
 
-        let envelope = try decoder.decode(DiscordGatewayEnvelope.self, from: data)
+        let envelope = try JSONDecoder().decode(DiscordGatewayEnvelope.self, from: data)
 
         guard case let .object(payload)? = envelope.d else {
             Issue.record("Expected READY payload object.")
             return
         }
 
-        guard case let .string(sessionID)? = payload["session_id"] else {
+        guard case let .string(session_id)? = payload["session_id"] else {
             Issue.record("Expected session_id in READY payload.")
             return
         }
 
-        guard case let .string(resumeURL)? = payload["resume_gateway_url"] else {
+        guard case let .string(resume_gateway_url)? = payload["resume_gateway_url"] else {
             Issue.record("Expected resume_gateway_url in READY payload.")
             return
         }
 
         #expect(envelope.t == "READY")
-        #expect(sessionID == "session-123")
-        #expect(resumeURL == "wss://gateway.discord.gg")
+        #expect(session_id == "session-123")
+        #expect(resume_gateway_url == "wss://gateway.discord.gg")
     }
 
     @Test
-    func messageCreatePayloadDecodesChannelIDWithSnakeCaseStrategy() throws {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-
+    func messageCreatePayloadDecodesWireFormatNamesDirectly() throws {
         let data = """
         {
           "op": 0,
@@ -98,13 +89,13 @@ struct DiscordGatewayPayloadTests {
         }
         """.data(using: .utf8)!
 
-        let envelope = try decoder.decode(DiscordGatewayEnvelope.self, from: data)
+        let envelope = try JSONDecoder().decode(DiscordGatewayEnvelope.self, from: data)
         let payloadData = try JSONEncoder().encode(envelope.d)
-        let event = try decoder.decode(DiscordMessageEvent.self, from: payloadData)
+        let event = try JSONDecoder().decode(DiscordMessageEvent.self, from: payloadData)
 
         #expect(envelope.t == "MESSAGE_CREATE")
-        #expect(event.channelID == "channel-123")
-        #expect(event.guildID == "guild-123")
+        #expect(event.channel_id == "channel-123")
+        #expect(event.guild_id == "guild-123")
         #expect(event.author.displayName == "Gale")
     }
 }

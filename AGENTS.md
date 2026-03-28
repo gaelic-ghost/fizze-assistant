@@ -37,6 +37,8 @@
 - Keep code modular and cohesive; group highly related concerns together.
 - Avoid spaghetti code and tight coupling.
 - Prefer pure Swift solutions where practical.
+- For JSON or API boundary models, prefer the literal wire-format field names directly instead of local style remapping.
+- Do not add `CodingKeys` as stylistic translation glue. Only keep them for real protocol mismatches that cannot be expressed by naming the property after the serialized field.
 
 ## Concurrency and Language Mode
 

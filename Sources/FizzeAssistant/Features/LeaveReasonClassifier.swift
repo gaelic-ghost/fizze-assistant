@@ -3,12 +3,12 @@ import Foundation
 actor ModerationEventCache {
     private var banEvents: [String: Date] = [:]
 
-    func recordBan(for userID: String, at date: Date = Date()) {
-        banEvents[userID] = date
+    func recordBan(for user_id: String, at date: Date = Date()) {
+        banEvents[user_id] = date
     }
 
-    func recentBan(for userID: String, within seconds: TimeInterval, now: Date = Date()) -> Bool {
-        guard let date = banEvents[userID] else {
+    func recentBan(for user_id: String, within seconds: TimeInterval, now: Date = Date()) -> Bool {
+        guard let date = banEvents[user_id] else {
             return false
         }
 
@@ -28,24 +28,24 @@ struct LeaveReasonClassifier {
     let configuration: AppConfiguration
     let banCache: ModerationEventCache
 
-    func classify(userID: String, now: Date = Date()) async throws -> LeaveReason {
-        if await banCache.recentBan(for: userID, within: configuration.leaveAuditLogLookbackSeconds, now: now) {
+    func classify(user_id: String, now: Date = Date()) async throws -> LeaveReason {
+        if await banCache.recentBan(for: user_id, within: configuration.leave_audit_log_lookback_seconds, now: now) {
             return .banned
         }
 
         let kicks = try await restClient.getAuditLogEntries(
-            guildID: configuration.guildID,
-            actionType: DiscordAuditLogActionType.memberKick
+            guild_id: configuration.guild_id,
+            action_type: DiscordAuditLogActionType.memberKick
         )
-        if kicks.contains(where: { $0.targetID == userID }) {
+        if kicks.contains(where: { $0.target_id == user_id }) {
             return .kicked
         }
 
         let bans = try await restClient.getAuditLogEntries(
-            guildID: configuration.guildID,
-            actionType: DiscordAuditLogActionType.memberBanAdd
+            guild_id: configuration.guild_id,
+            action_type: DiscordAuditLogActionType.memberBanAdd
         )
-        if bans.contains(where: { $0.targetID == userID }) {
+        if bans.contains(where: { $0.target_id == user_id }) {
             return .banned
         }
 

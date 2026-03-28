@@ -115,7 +115,7 @@ Only the dedicated config-owner roles may use `/config`. Normal staff roles can 
 
 Discord members with the native `Administrator` or `Manage Server` permission are also allowed to use staff and config-owner commands, even if their role IDs are not listed explicitly in the local config.
 
-The committed config already includes `suggestionsChannelID` so the future bot suggestions workflow can stay in sync across machines through normal git pull/push.
+The committed config already includes `suggestions_channel_id` so the future bot suggestions workflow can stay in sync across machines through normal git pull/push.
 
 ## SSH-Friendly Startup
 

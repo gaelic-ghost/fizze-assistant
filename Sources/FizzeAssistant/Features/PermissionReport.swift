@@ -36,9 +36,9 @@ struct PermissionReportBuilder {
         ]
 
         let me = try await restClient.getCurrentUser()
-        let guild = try await restClient.getGuild(id: configuration.guildID)
-        let botMember = try await restClient.getGuildMember(guildID: configuration.guildID, userID: me.id)
-        let roles = try await restClient.getGuildRoles(guildID: configuration.guildID)
+        let guild = try await restClient.getGuild(id: configuration.guild_id)
+        let botMember = try await restClient.getGuildMember(guild_id: configuration.guild_id, user_id: me.id)
+        let roles = try await restClient.getGuildRoles(guild_id: configuration.guild_id)
 
         let guildPermissions = PermissionCalculator.guildPermissions(memberRoleIDs: botMember.roles, roles: roles)
         let topRolePosition = roles
@@ -54,24 +54,24 @@ struct PermissionReportBuilder {
             issues.append(.init(severity: .blocking, message: "The bot is missing `View Audit Log`, so it cannot safely distinguish voluntary leaves from kicks/bans."))
         }
 
-        if roles.first(where: { $0.id == configuration.defaultMemberRoleID }) == nil {
+        if roles.first(where: { $0.id == configuration.default_member_role_id }) == nil {
             issues.append(.init(severity: .blocking, message: "The configured default member role could not be found in the guild."))
-        } else if let defaultRole = roles.first(where: { $0.id == configuration.defaultMemberRoleID }), defaultRole.position >= topRolePosition {
+        } else if let defaultRole = roles.first(where: { $0.id == configuration.default_member_role_id }), defaultRole.position >= topRolePosition {
             issues.append(.init(severity: .warning, message: "The default member role is above the bot's highest role in the role hierarchy, so auto-role assignment will fail until the role order is fixed."))
         }
 
-        for roleID in configuration.allowedStaffRoleIDs where roles.first(where: { $0.id == roleID }) == nil {
+        for roleID in configuration.allowed_staff_role_ids where roles.first(where: { $0.id == roleID }) == nil {
             issues.append(.init(severity: .warning, message: "Configured staff role ID \(roleID) was not found in the guild."))
         }
 
-        for roleID in configuration.allowedConfigRoleIDs where roles.first(where: { $0.id == roleID }) == nil {
+        for roleID in configuration.allowed_config_role_ids where roles.first(where: { $0.id == roleID }) == nil {
             issues.append(.init(severity: .warning, message: "Configured config-owner role ID \(roleID) was not found in the guild."))
         }
 
         let configuredChannels: [(String, String?)] = [
-            ("welcome", configuration.welcomeChannelID),
-            ("leave", configuration.leaveChannelID),
-            ("mod-log", configuration.modLogChannelID),
+            ("welcome", configuration.welcome_channel_id),
+            ("leave", configuration.leave_channel_id),
+            ("mod-log", configuration.mod_log_channel_id),
         ]
 
         for (label, id) in configuredChannels {
@@ -84,8 +84,8 @@ struct PermissionReportBuilder {
             let permissions = PermissionCalculator.channelPermissions(
                 member: botMember,
                 roles: roles,
-                overwrites: channel.permissionOverwrites ?? [],
-                everyoneID: configuration.guildID
+                overwrites: channel.permission_overwrites ?? [],
+                everyoneID: configuration.guild_id
             )
 
             if !permissions.contains(.viewChannel) {
@@ -98,8 +98,8 @@ struct PermissionReportBuilder {
         }
 
         issues.append(.init(severity: .info, message: "Connected to guild `\(guild.name)` as `\(me.displayName)`."))
-        issues.append(.init(severity: .info, message: "Invite URL: \(configuration.installURL)"))
-        issues.append(.init(severity: .info, message: "Permission integer: \(AppConfiguration.requiredPermissionInteger) (`View Channel`, `Send Messages`, `Manage Roles`, `View Audit Log`)."))
+        issues.append(.init(severity: .info, message: "Invite URL: \(configuration.install_url)"))
+        issues.append(.init(severity: .info, message: "Permission integer: \(AppConfiguration.required_permission_integer) (`View Channel`, `Send Messages`, `Manage Roles`, `View Audit Log`)."))
 
         return PermissionReport(issues: issues)
     }

@@ -9,10 +9,10 @@ typealias DiscordSnowflake = String
 struct DiscordUser: Codable, Sendable {
     var id: DiscordSnowflake
     var username: String
-    var globalName: String?
+    var global_name: String?
 
     var displayName: String {
-        globalName ?? username
+        global_name ?? username
     }
 }
 
@@ -26,20 +26,14 @@ struct DiscordRole: Codable, Sendable {
 struct DiscordGuild: Codable, Sendable {
     var id: DiscordSnowflake
     var name: String
-    var ownerID: DiscordSnowflake?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case ownerID = "ownerId"
-    }
+    var owner_id: DiscordSnowflake?
 }
 
 struct DiscordChannel: Codable, Sendable {
     var id: DiscordSnowflake
     var name: String?
     var type: Int
-    var permissionOverwrites: [DiscordPermissionOverwrite]?
+    var permission_overwrites: [DiscordPermissionOverwrite]?
 }
 
 struct DiscordPermissionOverwrite: Codable, Sendable {
@@ -59,21 +53,14 @@ struct DiscordGatewayBotResponse: Codable, Sendable {
 }
 
 struct DiscordAuditLogResponse: Codable, Sendable {
-    var auditLogEntries: [DiscordAuditLogEntry]
+    var audit_log_entries: [DiscordAuditLogEntry]
 }
 
 struct DiscordAuditLogEntry: Codable, Sendable {
     var id: DiscordSnowflake
-    var actionType: Int
-    var targetID: DiscordSnowflake?
-    var userID: DiscordSnowflake?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case actionType
-        case targetID = "targetId"
-        case userID = "userId"
-    }
+    var action_type: Int
+    var target_id: DiscordSnowflake?
+    var user_id: DiscordSnowflake?
 }
 
 struct DiscordSlashCommand: Codable, Sendable {
@@ -88,26 +75,17 @@ struct DiscordApplicationCommandOption: Codable, Sendable {
     var name: String
     var description: String
     var required: Bool?
-    var channelTypes: [Int]?
+    var channel_types: [Int]?
     var options: [DiscordApplicationCommandOption]? = nil
 }
 
 struct DiscordInteraction: Codable, Sendable {
     var id: DiscordSnowflake
-    var applicationID: DiscordSnowflake
+    var application_id: DiscordSnowflake
     var type: Int
     var token: String
     var member: DiscordInteractionMember?
     var data: DiscordInteractionData?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case applicationID = "applicationId"
-        case type
-        case token
-        case member
-        case data
-    }
 }
 
 struct DiscordInteractionMember: Codable, Sendable {
@@ -139,11 +117,7 @@ struct DiscordMessageCreate: Codable, Sendable {
 }
 
 struct DiscordCreateDMRequest: Codable, Sendable {
-    var recipientID: DiscordSnowflake
-
-    enum CodingKeys: String, CodingKey {
-        case recipientID = "recipientId"
-    }
+    var recipient_id: DiscordSnowflake
 }
 
 struct DiscordGatewayEnvelope: Codable, Sendable {
@@ -154,17 +128,12 @@ struct DiscordGatewayEnvelope: Codable, Sendable {
 }
 
 struct DiscordHello: Codable, Sendable {
-    var heartbeatInterval: Int
+    var heartbeat_interval: Int
 }
 
 struct DiscordGatewayReady: Codable, Sendable {
-    var sessionID: String
-    var resumeGatewayURL: String
-
-    enum CodingKeys: String, CodingKey {
-        case sessionID = "sessionId"
-        case resumeGatewayURL = "resumeGatewayUrl"
-    }
+    var session_id: String
+    var resume_gateway_url: String
 }
 
 struct DiscordGuildMemberAddEvent: Codable, Sendable {
@@ -181,20 +150,11 @@ struct DiscordGuildBanAddEvent: Codable, Sendable {
 
 struct DiscordMessageEvent: Codable, Sendable {
     var id: DiscordSnowflake
-    var channelID: DiscordSnowflake
-    var guildID: DiscordSnowflake?
+    var channel_id: DiscordSnowflake
+    var guild_id: DiscordSnowflake?
     var content: String
     var author: DiscordUser
-    var webhookID: DiscordSnowflake?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case channelID = "channelId"
-        case guildID = "guildId"
-        case content
-        case author
-        case webhookID = "webhookId"
-    }
+    var webhook_id: DiscordSnowflake?
 }
 
 enum JSONValue: Codable, Sendable {

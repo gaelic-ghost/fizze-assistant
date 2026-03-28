@@ -10,27 +10,27 @@ struct AppConfigurationTests {
 
         let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
         let configurationFile = BotConfigurationFile(
-            applicationID: "app",
-            guildID: "guild",
-            defaultMemberRoleID: "member",
-            allowedStaffRoleIDs: ["staff-a", "staff-b"],
-            allowedConfigRoleIDs: ["owner-a", "owner-b"],
-            databasePath: ".data/fizze-assistant.sqlite",
-            welcomeChannelID: "welcome",
-            leaveChannelID: "leave",
-            modLogChannelID: "mod-log",
-            suggestionsChannelID: "suggestions",
-            warnUsersViaDM: false,
-            welcomeMessage: "hi",
-            voluntaryLeaveMessage: "bye",
-            kickMessage: "kick",
-            banMessage: "ban",
-            unknownRemovalMessage: "unknown",
-            roleAssignmentFailureMessage: "role failure",
-            warningDMTemplate: "warn",
-            triggerCooldownSeconds: 30,
-            leaveAuditLogLookbackSeconds: 30,
-            iconicTriggers: []
+            application_id: "app",
+            guild_id: "guild",
+            default_member_role_id: "member",
+            allowed_staff_role_ids: ["staff-a", "staff-b"],
+            allowed_config_role_ids: ["owner-a", "owner-b"],
+            database_path: ".data/fizze-assistant.sqlite",
+            welcome_channel_id: "welcome",
+            leave_channel_id: "leave",
+            mod_log_channel_id: "mod-log",
+            suggestions_channel_id: "suggestions",
+            warn_users_via_dm: false,
+            welcome_message: "hi",
+            voluntary_leave_message: "bye",
+            kick_message: "kick",
+            ban_message: "ban",
+            unknown_removal_message: "unknown",
+            role_assignment_failure_message: "role failure",
+            warning_dm_template: "warn",
+            trigger_cooldown_seconds: 30,
+            leave_audit_log_lookback_seconds: 30,
+            iconic_triggers: []
         )
 
         let encoder = JSONEncoder()
@@ -42,9 +42,9 @@ struct AppConfigurationTests {
         ])
         let configuration = try await store.readyConfiguration()
 
-        #expect(configuration.allowedStaffRoleIDs == ["staff-a", "staff-b"])
-        #expect(configuration.allowedConfigRoleIDs == ["owner-a", "owner-b"])
-        #expect(configuration.databasePath == ".data/fizze-assistant.sqlite")
-        #expect(configuration.suggestionsChannelID == "suggestions")
+        #expect(configuration.allowed_staff_role_ids == ["staff-a", "staff-b"])
+        #expect(configuration.allowed_config_role_ids == ["owner-a", "owner-b"])
+        #expect(configuration.database_path == ".data/fizze-assistant.sqlite")
+        #expect(configuration.suggestions_channel_id == "suggestions")
     }
 }

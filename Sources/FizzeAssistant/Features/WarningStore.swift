@@ -3,17 +3,17 @@ import GRDB
 
 struct WarningRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
     var id: String
-    var guildID: String
-    var userID: String
-    var moderatorUserID: String
+    var guild_id: String
+    var user_id: String
+    var moderator_user_id: String
     var reason: String
-    var createdAt: Date
+    var created_at: Date
 
     enum Columns {
         static let id = Column(CodingKeys.id)
-        static let guildID = Column(CodingKeys.guildID)
-        static let userID = Column(CodingKeys.userID)
-        static let createdAt = Column(CodingKeys.createdAt)
+        static let guild_id = Column(CodingKeys.guild_id)
+        static let user_id = Column(CodingKeys.user_id)
+        static let created_at = Column(CodingKeys.created_at)
     }
 }
 
@@ -27,14 +27,14 @@ actor WarningStore {
         try Self.makeMigrator().migrate(dbQueue)
     }
 
-    func createWarning(guildID: String, userID: String, moderatorUserID: String, reason: String) throws -> WarningRecord {
+    func createWarning(guild_id: String, user_id: String, moderator_user_id: String, reason: String) throws -> WarningRecord {
         let warning = WarningRecord(
             id: UUID().uuidString,
-            guildID: guildID,
-            userID: userID,
-            moderatorUserID: moderatorUserID,
+            guild_id: guild_id,
+            user_id: user_id,
+            moderator_user_id: moderator_user_id,
             reason: reason,
-            createdAt: Date()
+            created_at: Date()
         )
 
         try dbQueue.write { db in
@@ -44,11 +44,11 @@ actor WarningStore {
         return warning
     }
 
-    func warnings(for userID: String, guildID: String) throws -> [WarningRecord] {
+    func warnings(for user_id: String, guild_id: String) throws -> [WarningRecord] {
         try dbQueue.read { db in
             try WarningRecord
-                .filter(WarningRecord.Columns.userID == userID && WarningRecord.Columns.guildID == guildID)
-                .order(WarningRecord.Columns.createdAt.desc)
+                .filter(WarningRecord.Columns.user_id == user_id && WarningRecord.Columns.guild_id == guild_id)
+                .order(WarningRecord.Columns.created_at.desc)
                 .fetchAll(db)
         }
     }
@@ -59,10 +59,10 @@ actor WarningStore {
         }
     }
 
-    func deleteWarnings(for userID: String, guildID: String) throws -> Int {
+    func deleteWarnings(for user_id: String, guild_id: String) throws -> Int {
         try dbQueue.write { db in
             try WarningRecord
-                .filter(WarningRecord.Columns.userID == userID && WarningRecord.Columns.guildID == guildID)
+                .filter(WarningRecord.Columns.user_id == user_id && WarningRecord.Columns.guild_id == guild_id)
                 .deleteAll(db)
         }
     }
@@ -72,11 +72,11 @@ actor WarningStore {
         migrator.registerMigration("createWarnings") { db in
             try db.create(table: "warningRecord") { table in
                 table.column("id", .text).primaryKey()
-                table.column("guildID", .text).notNull()
-                table.column("userID", .text).notNull()
-                table.column("moderatorUserID", .text).notNull()
+                table.column("guild_id", .text).notNull()
+                table.column("user_id", .text).notNull()
+                table.column("moderator_user_id", .text).notNull()
                 table.column("reason", .text).notNull()
-                table.column("createdAt", .datetime).notNull()
+                table.column("created_at", .datetime).notNull()
             }
         }
         return migrator
