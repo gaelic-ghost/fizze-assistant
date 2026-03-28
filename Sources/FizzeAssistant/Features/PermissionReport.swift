@@ -57,7 +57,7 @@ struct PermissionReportBuilder {
         if roles.first(where: { $0.id == configuration.defaultMemberRoleID }) == nil {
             issues.append(.init(severity: .blocking, message: "The configured default member role could not be found in the guild."))
         } else if let defaultRole = roles.first(where: { $0.id == configuration.defaultMemberRoleID }), defaultRole.position >= topRolePosition {
-            issues.append(.init(severity: .blocking, message: "The default member role must be below the bot's highest role in the role hierarchy."))
+            issues.append(.init(severity: .warning, message: "The default member role is above the bot's highest role in the role hierarchy, so auto-role assignment will fail until the role order is fixed."))
         }
 
         for roleID in configuration.allowedStaffRoleIDs where roles.first(where: { $0.id == roleID }) == nil {
