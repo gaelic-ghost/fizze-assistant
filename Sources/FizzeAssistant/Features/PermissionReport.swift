@@ -54,15 +54,33 @@ struct PermissionReportBuilder {
             issues.append(.init(severity: .blocking, message: "The bot is missing `View Audit Log`, so it cannot safely distinguish voluntary leaves from kicks/bans."))
         }
 
-        if let defaultRole = roles.first(where: { $0.id == configuration.defaultMemberRoleID }), defaultRole.position >= topRolePosition {
+        if roles.first(where: { $0.id == configuration.defaultMemberRoleID }) == nil {
+            issues.append(.init(severity: .blocking, message: "The configured default member role could not be found in the guild."))
+        } else if let defaultRole = roles.first(where: { $0.id == configuration.defaultMemberRoleID }), defaultRole.position >= topRolePosition {
             issues.append(.init(severity: .blocking, message: "The default member role must be below the bot's highest role in the role hierarchy."))
         }
 
-        let welcomeChannel = try await restClient.getChannel(id: configuration.welcomeChannelID)
-        let leaveChannel = try await restClient.getChannel(id: configuration.leaveChannelID)
-        let modLogChannel = try await restClient.getChannel(id: configuration.modLogChannelID)
+        for roleID in configuration.allowedStaffRoleIDs where roles.first(where: { $0.id == roleID }) == nil {
+            issues.append(.init(severity: .warning, message: "Configured staff role ID \(roleID) was not found in the guild."))
+        }
 
-        for channel in [welcomeChannel, leaveChannel, modLogChannel] {
+        for roleID in configuration.allowedConfigRoleIDs where roles.first(where: { $0.id == roleID }) == nil {
+            issues.append(.init(severity: .warning, message: "Configured config-owner role ID \(roleID) was not found in the guild."))
+        }
+
+        let configuredChannels: [(String, String?)] = [
+            ("welcome", configuration.welcomeChannelID),
+            ("leave", configuration.leaveChannelID),
+            ("mod-log", configuration.modLogChannelID),
+        ]
+
+        for (label, id) in configuredChannels {
+            guard let id else {
+                issues.append(.init(severity: .warning, message: "No \(label) channel is configured yet."))
+                continue
+            }
+
+            let channel = try await restClient.getChannel(id: id)
             let permissions = PermissionCalculator.channelPermissions(
                 member: botMember,
                 roles: roles,
@@ -79,7 +97,9 @@ struct PermissionReportBuilder {
             }
         }
 
-        issues.append(.init(severity: .info, message: "Connected to guild `\(guild.name)` as `\(me.displayName)`."))        
+        issues.append(.init(severity: .info, message: "Connected to guild `\(guild.name)` as `\(me.displayName)`."))
+        issues.append(.init(severity: .info, message: "Invite URL: \(configuration.installURL)"))
+        issues.append(.init(severity: .info, message: "Permission integer: \(AppConfiguration.requiredPermissionInteger) (`View Channel`, `Send Messages`, `Manage Roles`, `View Audit Log`)."))
 
         return PermissionReport(issues: issues)
     }

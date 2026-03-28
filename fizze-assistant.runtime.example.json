@@ -1,0 +1,21 @@
+{
+  "welcomeChannelID": "WELCOME_CHANNEL_ID",
+  "leaveChannelID": "LEAVE_CHANNEL_ID",
+  "modLogChannelID": "MOD_LOG_CHANNEL_ID",
+  "warnUsersViaDM": false,
+  "welcomeMessage": "Welcome to the server, {user_mention}!",
+  "voluntaryLeaveMessage": "{username} left the server.",
+  "kickMessage": "{username} was kicked from the server.",
+  "banMessage": "{username} was banned from the server.",
+  "unknownRemovalMessage": "{username} left or was removed from the server.",
+  "roleAssignmentFailureMessage": "I couldn't assign the default member role to {user_mention}. Please check role hierarchy and Manage Roles permissions.",
+  "warningDMTemplate": "You have been warned in {guild_name}: {reason}",
+  "triggerCooldownSeconds": 30,
+  "leaveAuditLogLookbackSeconds": 30,
+  "iconicTriggers": [
+    {
+      "trigger": "fizze time",
+      "response": "sparkle mode engaged"
+    }
+  ]
+}

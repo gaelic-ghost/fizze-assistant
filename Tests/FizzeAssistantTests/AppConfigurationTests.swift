@@ -4,20 +4,22 @@ import Testing
 
 struct AppConfigurationTests {
     @Test
-    func environmentOverlayParsesStaffRoles() throws {
+    func configurationStoreParsesRoleListsAndDefaults() async throws {
         let environment = [
             "DISCORD_BOT_TOKEN": "token",
             "DISCORD_APPLICATION_ID": "app",
             "DISCORD_GUILD_ID": "guild",
-            "DISCORD_WELCOME_CHANNEL_ID": "welcome",
-            "DISCORD_LEAVE_CHANNEL_ID": "leave",
-            "DISCORD_MOD_LOG_CHANNEL_ID": "mod",
             "DISCORD_DEFAULT_MEMBER_ROLE_ID": "member",
             "DISCORD_ALLOWED_STAFF_ROLE_IDS": "staff-a, staff-b",
+            "DISCORD_ALLOWED_CONFIG_ROLE_IDS": "owner-a, owner-b",
         ]
 
-        let configuration = try AppConfiguration.load(from: nil, environment: environment)
+        let store = try ConfigurationStore.load(from: nil, environment: environment)
+        let configuration = try await store.readyConfiguration()
+
         #expect(configuration.allowedStaffRoleIDs == ["staff-a", "staff-b"])
+        #expect(configuration.allowedConfigRoleIDs == ["owner-a", "owner-b"])
         #expect(configuration.databasePath == ".data/fizze-assistant.sqlite")
+        #expect(configuration.runtimeConfigPath == ".data/runtime-config.json")
     }
 }

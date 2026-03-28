@@ -45,6 +45,46 @@ struct CommandRegistrar {
                     DiscordApplicationCommandOption(type: 6, name: "user", description: "User whose warnings should be removed.", required: true, channelTypes: nil),
                 ]
             ),
+            DiscordSlashCommand(
+                name: "config",
+                description: "View or adjust the bot's runtime configuration.",
+                options: [
+                    DiscordApplicationCommandOption(type: 1, name: "show", description: "Show the current runtime configuration.", required: nil, channelTypes: nil, options: nil),
+                    DiscordApplicationCommandOption(
+                        type: 1,
+                        name: "set",
+                        description: "Set one runtime configuration value.",
+                        required: nil,
+                        channelTypes: nil,
+                        options: [
+                            DiscordApplicationCommandOption(type: 3, name: "setting", description: "Editable setting key.", required: true, channelTypes: nil, options: nil),
+                            DiscordApplicationCommandOption(type: 3, name: "value", description: "New value.", required: true, channelTypes: nil, options: nil),
+                        ]
+                    ),
+                    DiscordApplicationCommandOption(
+                        type: 1,
+                        name: "trigger-add",
+                        description: "Add or replace an exact-match trigger.",
+                        required: nil,
+                        channelTypes: nil,
+                        options: [
+                            DiscordApplicationCommandOption(type: 3, name: "trigger", description: "Exact phrase to match.", required: true, channelTypes: nil, options: nil),
+                            DiscordApplicationCommandOption(type: 3, name: "response", description: "Message to send.", required: true, channelTypes: nil, options: nil),
+                        ]
+                    ),
+                    DiscordApplicationCommandOption(
+                        type: 1,
+                        name: "trigger-remove",
+                        description: "Remove an exact-match trigger.",
+                        required: nil,
+                        channelTypes: nil,
+                        options: [
+                            DiscordApplicationCommandOption(type: 3, name: "trigger", description: "Trigger phrase to remove.", required: true, channelTypes: nil, options: nil),
+                        ]
+                    ),
+                    DiscordApplicationCommandOption(type: 1, name: "trigger-list", description: "List exact-match triggers.", required: nil, channelTypes: nil, options: nil),
+                ]
+            ),
         ]
 
         try await restClient.upsertGuildCommands(

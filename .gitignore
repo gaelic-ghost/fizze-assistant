@@ -8,3 +8,4 @@ DerivedData/
 .netrc
 .data/
 fizze-assistant.local.json
+fizze-assistant.log

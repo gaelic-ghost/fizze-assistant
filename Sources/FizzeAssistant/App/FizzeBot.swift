@@ -4,7 +4,7 @@ import Logging
 actor FizzeBot {
     // MARK: Stored Properties
 
-    private let configuration: AppConfiguration
+    private let configurationStore: ConfigurationStore
     private let restClient: DiscordRESTClient
     private let logger: Logger
     private let warningStore: WarningStore
@@ -17,10 +17,11 @@ actor FizzeBot {
 
     // MARK: Lifecycle
 
-    init(configuration: AppConfiguration, restClient: DiscordRESTClient, logger: Logger) async throws {
-        self.configuration = configuration
+    init(configurationStore: ConfigurationStore, restClient: DiscordRESTClient, logger: Logger) async throws {
+        self.configurationStore = configurationStore
         self.restClient = restClient
         self.logger = logger
+        let configuration = await configurationStore.currentConfiguration()
         self.warningStore = try WarningStore(path: configuration.databasePath)
         self.botUserID = try await restClient.getCurrentUser().id
 
@@ -31,6 +32,7 @@ actor FizzeBot {
     // MARK: Run Loop
 
     func run() async throws {
+        let configuration = await configurationStore.currentConfiguration()
         let gatewayBot = try await restClient.getGatewayBot()
         guard let url = URL(string: "\(gatewayBot.url)?v=10&encoding=json") else {
             throw UserFacingError("Discord returned an invalid Gateway URL.")
@@ -74,7 +76,7 @@ actor FizzeBot {
             case let .interaction(interaction):
                 let handler = InteractionHandler(
                     restClient: restClient,
-                    configuration: configuration,
+                    configurationStore: configurationStore,
                     warningStore: warningStore,
                     logger: logger
                 )
@@ -89,6 +91,7 @@ actor FizzeBot {
     }
 
     private func handleMemberJoined(_ event: DiscordGuildMemberAddEvent) async throws {
+        let configuration = await configurationStore.currentConfiguration()
         do {
             try await restClient.addRole(
                 to: event.user.id,
@@ -97,15 +100,24 @@ actor FizzeBot {
             )
         } catch {
             let message = TemplateRenderer.render(configuration.roleAssignmentFailureMessage, user: event.user, guildName: guildName)
-            try? await restClient.createMessage(channelID: configuration.modLogChannelID, content: message)
+            if let modLogChannelID = configuration.modLogChannelID {
+                try? await restClient.createMessage(channelID: modLogChannelID, content: message)
+            } else {
+                logger.warning("Mod log channel is not configured; skipping role assignment failure message.")
+            }
             throw error
         }
 
         let welcome = TemplateRenderer.render(configuration.welcomeMessage, user: event.user, guildName: guildName)
-        try await restClient.createMessage(channelID: configuration.welcomeChannelID, content: welcome)
+        guard let welcomeChannelID = configuration.welcomeChannelID else {
+            logger.warning("Welcome channel is not configured; skipping welcome message.")
+            return
+        }
+        try await restClient.createMessage(channelID: welcomeChannelID, content: welcome)
     }
 
     private func handleMemberRemoved(_ event: DiscordGuildMemberRemoveEvent) async throws {
+        let configuration = await configurationStore.currentConfiguration()
         let classifier = LeaveReasonClassifier(
             restClient: restClient,
             configuration: configuration,
@@ -132,10 +144,15 @@ actor FizzeBot {
         }
 
         let announcement = TemplateRenderer.render(template, user: event.user, guildName: guildName)
-        try await restClient.createMessage(channelID: configuration.leaveChannelID, content: announcement)
+        guard let leaveChannelID = configuration.leaveChannelID else {
+            logger.warning("Leave channel is not configured; skipping leave announcement.")
+            return
+        }
+        try await restClient.createMessage(channelID: leaveChannelID, content: announcement)
     }
 
     private func handleMessageCreate(_ event: DiscordMessageEvent) async throws {
+        let configuration = await configurationStore.currentConfiguration()
         guard event.guildID == configuration.guildID else { return }
         guard event.webhookID == nil else { return }
         guard event.author.id != botUserID else { return }

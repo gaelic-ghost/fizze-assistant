@@ -11,6 +11,7 @@ struct FizzeAssistantCLI: AsyncParsableCommand {
             RunCommand.self,
             RegisterCommandsCommand.self,
             CheckCommand.self,
+            ConfigCommand.self,
         ],
         defaultSubcommand: RunCommand.self
     )
@@ -63,5 +64,59 @@ struct CheckCommand: AsyncParsableCommand {
 
     mutating func run() async throws {
         try await BotApplication.run(command: .check, options: options)
+    }
+}
+
+struct ConfigCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "config",
+        abstract: "Manage the local runtime configuration file.",
+        subcommands: [
+            ConfigShowCommand.self,
+            ConfigInitCommand.self,
+            ConfigValidateCommand.self,
+        ]
+    )
+}
+
+struct ConfigShowCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "show",
+        abstract: "Print the current runtime configuration."
+    )
+
+    @OptionGroup
+    var options: SharedOptions
+
+    mutating func run() async throws {
+        try await BotApplication.run(command: .configShow, options: options)
+    }
+}
+
+struct ConfigInitCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "init",
+        abstract: "Create the runtime configuration file if it does not exist."
+    )
+
+    @OptionGroup
+    var options: SharedOptions
+
+    mutating func run() async throws {
+        try await BotApplication.run(command: .configInit, options: options)
+    }
+}
+
+struct ConfigValidateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "validate",
+        abstract: "Validate the local and runtime configuration setup."
+    )
+
+    @OptionGroup
+    var options: SharedOptions
+
+    mutating func run() async throws {
+        try await BotApplication.run(command: .configValidate, options: options)
     }
 }

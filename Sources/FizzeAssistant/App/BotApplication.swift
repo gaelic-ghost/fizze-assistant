@@ -5,6 +5,9 @@ enum AppCommand {
     case run
     case registerCommands
     case check
+    case configShow
+    case configInit
+    case configValidate
 }
 
 enum BotApplication {
@@ -17,17 +20,48 @@ enum BotApplication {
         configuredLogger[metadataKey: "command"] = .string(String(describing: command))
         configuredLogger[metadataKey: "mode"] = .string(options.verbose ? "verbose" : "default")
 
-        let configuration = try AppConfiguration.load(
+        let configurationStore = try ConfigurationStore.load(
             from: options.config.map(URL.init(fileURLWithPath:)),
             environment: ProcessInfo.processInfo.environment
         )
-
-        let restClient = DiscordRESTClient(
-            token: configuration.botToken,
-            logger: configuredLogger
-        )
-
         switch command {
+        case .configShow:
+            let runtime = await configurationStore.runtimeConfiguration()
+            print(try runtime.prettyPrintedJSON())
+
+        case .configInit:
+            let url = try await configurationStore.initializeRuntimeConfigurationFileIfNeeded()
+            print("Runtime configuration is available at \(url.path)")
+
+        case .configValidate:
+            let runtime = await configurationStore.runtimeConfiguration()
+            let install = await configurationStore.installConfiguration()
+            print("Runtime configuration path: \(install.runtimeConfigPath)")
+            if install.setupWarnings.isEmpty {
+                print("Install configuration is ready for runtime use.")
+            } else {
+                print("Install configuration warnings:")
+                for warning in install.setupWarnings {
+                    print("- \(warning)")
+                }
+            }
+            if runtime.warnings.isEmpty {
+                print("Runtime configuration is valid.")
+            } else {
+                print("Runtime configuration warnings:")
+                for warning in runtime.warnings {
+                    print("- \(warning)")
+                }
+            }
+
+        case .registerCommands, .check, .run:
+            let configuration = try await configurationStore.readyConfiguration()
+            let restClient = DiscordRESTClient(
+                token: configuration.botToken,
+                logger: configuredLogger
+            )
+
+            switch command {
         case .registerCommands:
             let registrar = CommandRegistrar(restClient: restClient, configuration: configuration, logger: configuredLogger)
             try await registrar.registerGuildCommands()
@@ -57,12 +91,15 @@ enum BotApplication {
             }
 
             let bot = try await FizzeBot(
-                configuration: configuration,
+                configurationStore: configurationStore,
                 restClient: restClient,
                 logger: configuredLogger
             )
 
             try await bot.run()
+            default:
+                break
+            }
         }
     }
 }

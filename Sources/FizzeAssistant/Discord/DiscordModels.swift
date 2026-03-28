@@ -100,6 +100,7 @@ struct DiscordApplicationCommandOption: Codable, Sendable {
     var description: String
     var required: Bool?
     var channelTypes: [Int]?
+    var options: [DiscordApplicationCommandOption]? = nil
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -107,6 +108,7 @@ struct DiscordApplicationCommandOption: Codable, Sendable {
         case description
         case required
         case channelTypes = "channel_types"
+        case options
     }
 }
 
@@ -143,6 +145,7 @@ struct DiscordInteractionOption: Codable, Sendable {
     var name: String
     var type: Int
     var value: JSONValue?
+    var options: [DiscordInteractionOption]? = nil
 }
 
 struct DiscordMessageCreate: Codable, Sendable {
