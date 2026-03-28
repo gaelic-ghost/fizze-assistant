@@ -80,6 +80,12 @@ cp fizze-assistant.runtime.example.json .data/runtime-config.json
 export DISCORD_BOT_TOKEN="YOUR_BOT_TOKEN"
 ```
 
+On a deployment machine such as the Mac mini, you can also keep the token in `.env.local`:
+
+```bash
+export DISCORD_BOT_TOKEN="YOUR_BOT_TOKEN"
+```
+
 ## Commands
 
 Build and run locally:
@@ -102,6 +108,12 @@ swift build -c release
 .build/release/fizze-assistant check --config fizze-assistant.local.json
 .build/release/fizze-assistant register-commands --config fizze-assistant.local.json
 .build/release/fizze-assistant run --config fizze-assistant.local.json
+```
+
+There is also a thin setup script for the Mac mini flow. It loads `.env.local`, builds the release binary if needed, initializes runtime config if missing, runs `check`, registers commands, and then starts the bot:
+
+```bash
+./scripts/setup.sh
 ```
 
 Discord-side runtime config commands:
