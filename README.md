@@ -142,6 +142,12 @@ There is also a small helper for that SSH-friendly background case:
 
 It runs `scripts/setup.sh` under `nohup`, writes output to `fizze-assistant.log`, and stores the process ID in `.data/fizze-assistant.pid`.
 
+To stop the background process cleanly:
+
+```bash
+./scripts/stop.sh
+```
+
 That keeps the process easy to start over SSH without committing to a larger deployment setup first.
 
 ## Secret Safety
