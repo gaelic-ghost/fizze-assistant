@@ -13,7 +13,7 @@
   "welcomeChannelID": "819618899435585577",
   "leaveChannelID": "819618899435585577",
   "modLogChannelID": "819616753301585940",
-  "suggestionsChannelID": null,
+  "suggestionsChannelID": "1486722375616561202",
   "warnUsersViaDM": false,
   "welcomeMessage": "Welcome to the server, {user_mention}!",
   "voluntaryLeaveMessage": "{username} left the server.",
