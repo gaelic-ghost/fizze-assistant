@@ -95,7 +95,6 @@ actor DiscordGatewayClient {
         guard isRunning else { return }
 
         heartbeatTask?.cancel()
-        receiveTask?.cancel()
         webSocketTask?.cancel(with: .goingAway, reason: nil)
 
         let targetURL = resumeURL ?? gatewayURL
@@ -238,7 +237,7 @@ actor DiscordGatewayClient {
     private func handleDispatch(eventName: String?, payload: JSONValue?) async throws {
         switch eventName {
         case "READY":
-            let ready = try decodePayload(DiscordGatewayReady.self, from: payload)
+            let ready = try parseReadyPayload(from: payload)
             sessionID = ready.sessionID
             resumeURL = URL(string: "\(ready.resumeGatewayURL)?v=10&encoding=json")
 
@@ -297,6 +296,36 @@ actor DiscordGatewayClient {
         }
     }
 
+    private func parseReadyPayload(from payload: JSONValue?) throws -> DiscordGatewayReady {
+        guard case let .object(object)? = payload else {
+            throw GatewayError.missingPayload
+        }
+
+        guard let sessionID = stringValue(from: object["session_id"] ?? object["sessionId"]) else {
+            throw GatewayError.missingSessionID
+        }
+
+        guard let resumeGatewayURL = stringValue(from: object["resume_gateway_url"] ?? object["resumeGatewayUrl"]) else {
+            throw GatewayError.missingResumeGatewayURL
+        }
+
+        return DiscordGatewayReady(sessionID: sessionID, resumeGatewayURL: resumeGatewayURL)
+    }
+
+    private func stringValue(from value: JSONValue?) -> String? {
+        switch value {
+        case let .string(string):
+            return string
+        case let .number(number):
+            if number.rounded() == number {
+                return String(Int(number))
+            }
+            return String(number)
+        default:
+            return nil
+        }
+    }
+
     private func reconnectDelaySeconds(forAttempt attempt: Int) -> Double {
         let exponential = min(pow(2.0, Double(attempt)), 30.0)
         let jitter = Double.random(in: 0 ... 0.5)
@@ -309,6 +338,8 @@ enum GatewayError: LocalizedError {
     case missingPayload
     case missingHeartbeatInterval
     case invalidHeartbeatInterval
+    case missingSessionID
+    case missingResumeGatewayURL
 
     var errorDescription: String? {
         switch self {
@@ -320,6 +351,10 @@ enum GatewayError: LocalizedError {
             return "Discord Gateway hello payload did not include a heartbeat interval."
         case .invalidHeartbeatInterval:
             return "Discord Gateway hello payload included an invalid heartbeat interval."
+        case .missingSessionID:
+            return "Discord Gateway READY payload did not include a session ID."
+        case .missingResumeGatewayURL:
+            return "Discord Gateway READY payload did not include a resume Gateway URL."
         }
     }
 }
