@@ -1,9 +1,5 @@
 import Foundation
 
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
-
 typealias DiscordSnowflake = String
 
 struct DiscordUser: Codable, Sendable {

@@ -1,10 +1,6 @@
 import Foundation
 import Logging
 
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
-
 actor DiscordGatewayClient {
     // MARK: Types
 
