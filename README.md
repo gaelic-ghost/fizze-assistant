@@ -97,7 +97,7 @@ swift build -c release
 .build/release/fizze-assistant run --config fizze-assistant.json
 ```
 
-There is also a thin setup script for the Mac mini flow. It loads `.env.local`, builds the release binary if needed, runs `check`, registers commands, and then starts the bot:
+There is also a thin setup script for the Mac mini flow. It loads `.env.local`, rebuilds the release binary when it is missing or stale, runs `check`, registers commands, and then starts the bot:
 
 ```bash
 ./scripts/setup.sh

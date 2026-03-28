@@ -29,8 +29,8 @@ fi
 
 cd "$REPO_DIR"
 
-if [ ! -x "$BINARY_PATH" ]; then
-  echo "Release binary not found. Building..."
+if [ ! -x "$BINARY_PATH" ] || [ "$REPO_DIR/Package.swift" -nt "$BINARY_PATH" ] || [ "$REPO_DIR/Package.resolved" -nt "$BINARY_PATH" ] || find "$REPO_DIR/Sources" "$REPO_DIR/Tests" "$REPO_DIR/scripts" -type f -newer "$BINARY_PATH" | grep -q .; then
+  echo "Release binary missing or stale. Building..."
   swift build -c release
 fi
 
