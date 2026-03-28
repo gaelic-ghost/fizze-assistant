@@ -133,8 +133,7 @@ actor DiscordGatewayClient {
 
         switch envelope.op {
         case DiscordGatewayOpCode.hello:
-            let hello = try decodePayload(DiscordHello.self, from: envelope.d)
-            heartbeatIntervalNanoseconds = UInt64(hello.heartbeatInterval) * 1_000_000
+            heartbeatIntervalNanoseconds = try parseHeartbeatInterval(from: envelope.d)
             heartbeatTask?.cancel()
             heartbeatTask = Task { [weak self] in
                 await self?.heartbeatLoop()
@@ -261,11 +260,35 @@ actor DiscordGatewayClient {
         let data = try encoder.encode(payload)
         return try decoder.decode(type, from: data)
     }
+
+    private func parseHeartbeatInterval(from payload: JSONValue?) throws -> UInt64 {
+        guard case let .object(object)? = payload else {
+            throw GatewayError.missingPayload
+        }
+
+        guard let heartbeatValue = object["heartbeat_interval"] ?? object["heartbeatInterval"] else {
+            throw GatewayError.missingHeartbeatInterval
+        }
+
+        switch heartbeatValue {
+        case let .number(value):
+            return UInt64(value) * 1_000_000
+        case let .string(value):
+            guard let parsed = Double(value) else {
+                throw GatewayError.invalidHeartbeatInterval
+            }
+            return UInt64(parsed) * 1_000_000
+        default:
+            throw GatewayError.invalidHeartbeatInterval
+        }
+    }
 }
 
 enum GatewayError: LocalizedError {
     case encodingFailed
     case missingPayload
+    case missingHeartbeatInterval
+    case invalidHeartbeatInterval
 
     var errorDescription: String? {
         switch self {
@@ -273,6 +296,10 @@ enum GatewayError: LocalizedError {
             return "Failed to encode a Gateway payload."
         case .missingPayload:
             return "Missing Gateway payload."
+        case .missingHeartbeatInterval:
+            return "Discord Gateway hello payload did not include a heartbeat interval."
+        case .invalidHeartbeatInterval:
+            return "Discord Gateway hello payload included an invalid heartbeat interval."
         }
     }
 }
