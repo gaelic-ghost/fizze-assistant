@@ -148,6 +148,9 @@ actor DiscordGatewayClient {
         switch envelope.op {
         case DiscordGatewayOpCode.hello:
             heartbeat_interval_nanoseconds = try parseHeartbeatInterval(from: envelope.d)
+            logger.info("DiscordGatewayClient.handle: Discord sent HELLO, so the bot now knows the heartbeat interval and can begin session setup.", metadata: [
+                "heartbeat_interval_nanoseconds": .string(String(heartbeat_interval_nanoseconds)),
+            ])
             heartbeatTask?.cancel()
             heartbeatTask = Task { [weak self] in
                 await self?.heartbeatLoop()
@@ -167,6 +170,7 @@ actor DiscordGatewayClient {
 
         case DiscordGatewayOpCode.heartbeatAck:
             awaitingHeartbeatACK = false
+            logger.debug("DiscordGatewayClient.handle: Discord acknowledged the latest heartbeat, so the Gateway session is still healthy.")
 
         default:
             break
@@ -202,6 +206,10 @@ actor DiscordGatewayClient {
     private func sendIdentifyOrResume() async throws {
         if let session_id, let resumeURL {
             self.resumeURL = resumeURL
+            logger.info("DiscordGatewayClient.sendIdentifyOrResume: the bot has an existing session, so it is sending a resume request to Discord Gateway.", metadata: [
+                "session_id": .string(session_id),
+                "resume_url": .string(resumeURL.absoluteString),
+            ])
             try await send(payload: [
                 "op": .number(Double(DiscordGatewayOpCode.resume)),
                 "d": .object([
@@ -213,6 +221,7 @@ actor DiscordGatewayClient {
             return
         }
 
+        logger.info("DiscordGatewayClient.sendIdentifyOrResume: the bot is sending a fresh identify request to Discord Gateway to start a new session.")
         try await send(payload: [
             "op": .number(Double(DiscordGatewayOpCode.identify)),
             "d": .object([
@@ -241,6 +250,10 @@ actor DiscordGatewayClient {
             let ready = try parseReadyPayload(from: payload)
             session_id = ready.session_id
             resumeURL = URL(string: "\(ready.resume_gateway_url)?v=10&encoding=json")
+            logger.info("DiscordGatewayClient.handleDispatch: Discord sent READY, so the Gateway session is established and the bot is now online for events.", metadata: [
+                "session_id": .string(ready.session_id),
+                "resume_gateway_url": .string(ready.resume_gateway_url),
+            ])
 
         case "GUILD_MEMBER_ADD":
             let event = try decodePayload(DiscordGuildMemberAddEvent.self, from: payload)
