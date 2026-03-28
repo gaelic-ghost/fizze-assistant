@@ -75,7 +75,7 @@ actor DiscordGatewayClient {
     // MARK: Connection Management
 
     private func connect(using url: URL) async throws {
-        logger.info("Connecting to Discord Gateway.", metadata: ["url": .string(url.absoluteString)])
+        logger.info("DiscordGatewayClient.connect: opening the live Discord Gateway connection for event streaming.", metadata: ["url": .string(url.absoluteString)])
 
         let task = session.webSocketTask(with: url)
         webSocketTask = task
@@ -102,7 +102,7 @@ actor DiscordGatewayClient {
         do {
             let delay = reconnectDelaySeconds(forAttempt: reconnectAttempt)
             if delay > 0 {
-                logger.warning("Discord Gateway is reconnecting with a short backoff.", metadata: [
+                logger.warning("DiscordGatewayClient.reconnect: the Gateway connection needs to reopen, so the bot is waiting briefly before the next attempt.", metadata: [
                     "delay_seconds": .string(String(format: "%.2f", delay)),
                     "attempt": .string(String(reconnectAttempt + 1)),
                 ])
@@ -111,7 +111,7 @@ actor DiscordGatewayClient {
             reconnectAttempt += 1
             try await connect(using: targetURL)
         } catch {
-            logger.warning("Discord Gateway did not reconnect on this attempt, but the bot will keep trying.", metadata: ["error": .string(String(describing: error))])
+            logger.warning("DiscordGatewayClient.reconnect: this reconnect attempt did not complete, but the bot will keep trying while it stays running.", metadata: ["error": .string(String(describing: error))])
         }
     }
 
@@ -125,15 +125,15 @@ actor DiscordGatewayClient {
                 case let .data(data):
                     try await handle(messageData: data)
                 @unknown default:
-                    logger.warning("Received unsupported WebSocket message type.")
+                    logger.warning("DiscordGatewayClient.receiveLoop: Discord sent a WebSocket message type this client does not decode yet, so that frame will be skipped while the connection stays open.")
                 }
             } catch is CancellationError {
                 return
             } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled {
-                logger.debug("Gateway receive was cancelled.")
+                logger.debug("DiscordGatewayClient.receiveLoop: the previous Gateway receive task was cancelled because the connection is being refreshed.")
                 return
             } catch {
-                logger.warning("Discord Gateway connection dropped, so the bot is opening a fresh connection.", metadata: ["error": .string(String(describing: error))])
+                logger.warning("DiscordGatewayClient.receiveLoop: the live Gateway connection dropped, so the bot is opening a fresh connection.", metadata: ["error": .string(String(describing: error))])
                 await reconnect()
                 return
             }
@@ -177,7 +177,7 @@ actor DiscordGatewayClient {
         while isRunning {
             do {
                 if awaitingHeartbeatACK {
-                    logger.warning("Discord Gateway heartbeat timed out, so the bot is refreshing the connection.")
+                    logger.warning("DiscordGatewayClient.heartbeatLoop: Discord stopped acknowledging heartbeats in time, so the bot is refreshing the Gateway connection.")
                     await reconnect()
                     return
                 }
@@ -192,7 +192,7 @@ actor DiscordGatewayClient {
             } catch is CancellationError {
                 return
             } catch {
-                logger.warning("The Gateway heartbeat did not complete cleanly, so the bot is reopening the connection.", metadata: ["error": .string(String(describing: error))])
+                logger.warning("DiscordGatewayClient.heartbeatLoop: the heartbeat send cycle did not complete cleanly, so the bot is reopening the Gateway connection.", metadata: ["error": .string(String(describing: error))])
                 await reconnect()
                 return
             }
@@ -345,17 +345,17 @@ enum GatewayError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .encodingFailed:
-            return "Failed to encode a Gateway payload."
+            return "DiscordGatewayClient.send: the bot could not encode a Discord Gateway payload before sending it. The most likely cause is an unexpected value in the outbound payload dictionary."
         case .missingPayload:
-            return "Missing Gateway payload."
+            return "DiscordGatewayClient.handle: Discord sent a Gateway event without the expected payload body. The most likely cause is an unexpected event shape from the Gateway."
         case .missingHeartbeatInterval:
-            return "Discord Gateway hello payload did not include a heartbeat interval."
+            return "DiscordGatewayClient.parseHeartbeatInterval: the Discord HELLO event did not include `heartbeat_interval`, so the bot does not know how often to heartbeat. The most likely cause is an unexpected Gateway payload shape."
         case .invalidHeartbeatInterval:
-            return "Discord Gateway hello payload included an invalid heartbeat interval."
+            return "DiscordGatewayClient.parseHeartbeatInterval: the Discord HELLO event included an unreadable `heartbeat_interval`, so the bot could not start heartbeating. The most likely cause is an unexpected Gateway payload value."
         case .missingSessionID:
-            return "Discord Gateway READY payload did not include a session ID."
+            return "DiscordGatewayClient.parseReadyPayload: the Discord READY event did not include `session_id`, so the bot cannot resume this session later. The most likely cause is an unexpected READY payload shape."
         case .missingResumeGatewayURL:
-            return "Discord Gateway READY payload did not include a resume Gateway URL."
+            return "DiscordGatewayClient.parseReadyPayload: the Discord READY event did not include `resume_gateway_url`, so the bot cannot resume this session later. The most likely cause is an unexpected READY payload shape."
         }
     }
 }

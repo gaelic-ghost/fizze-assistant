@@ -93,14 +93,14 @@ struct PermissionReportBuilder {
             if !permissions.contains(.viewChannel) {
                 let key = "view:\(channel.id)"
                 if reportedChannelWarnings.insert(key).inserted {
-                    issues.append(.init(severity: .warning, message: "The bot can't view channel \(channel.name ?? channel.id) yet, so any features routed there will stay paused until that permission is allowed."))
+                    issues.append(.init(severity: .warning, message: "PermissionReportBuilder.build: the bot does not have `View Channel` for \(channel.name ?? channel.id), so any feature routed there will stay paused until that Discord permission is allowed. The most likely cause is a channel override or category override in the server."))
                 }
             }
 
             if !permissions.contains(.sendMessages) {
                 let key = "send:\(channel.id)"
                 if reportedChannelWarnings.insert(key).inserted {
-                    issues.append(.init(severity: .warning, message: "The bot can't send messages in channel \(channel.name ?? channel.id) yet, so any configured posts there will stay paused until that permission is allowed."))
+                    issues.append(.init(severity: .warning, message: "PermissionReportBuilder.build: the bot does not have `Send Messages` for \(channel.name ?? channel.id), so configured posts there will stay paused until that Discord permission is allowed. The most likely cause is a channel override or category override in the server."))
                 }
             }
         }

@@ -182,7 +182,7 @@ struct DiscordRESTClient {
 
         if http.statusCode == 429, attempt < maxRetryAttempts {
             let delay = rateLimitDelay(response: http, body: data)
-            logger.warning("Discord REST rate limited request; retrying.", metadata: [
+            logger.warning("DiscordRESTClient.performRawRequest: Discord asked the bot to slow down on this API route, so the request will pause briefly and retry.", metadata: [
                 "path": .string(path),
                 "retry_after_seconds": .string(String(delay)),
                 "attempt": .string(String(attempt + 1)),
@@ -193,7 +193,7 @@ struct DiscordRESTClient {
 
         if (500 ... 599).contains(http.statusCode), attempt < maxRetryAttempts {
             let delay = min(pow(2.0, Double(attempt)), 30.0)
-            logger.warning("Discord REST server error; retrying with backoff.", metadata: [
+            logger.warning("DiscordRESTClient.performRawRequest: Discord returned a temporary server error for this API route, so the request will retry with backoff.", metadata: [
                 "path": .string(path),
                 "status_code": .string(String(http.statusCode)),
                 "retry_after_seconds": .string(String(delay)),
@@ -234,11 +234,11 @@ enum RESTError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .invalidURL(path):
-            return "Invalid Discord URL for path \(path)."
+            return "DiscordRESTClient.request: the bot could not build a valid Discord URL for path `\(path)`. The most likely cause is a malformed route string in the code."
         case .invalidResponse:
-            return "Discord returned an invalid response."
+            return "DiscordRESTClient.performRawRequest: Discord returned a response that was not valid HTTP. The most likely cause is a transport-level failure between the bot and the Discord API."
         case let .discordError(statusCode, body):
-            return "Discord responded with status \(statusCode). Details: \(body)"
+            return "DiscordRESTClient.performRawRequest: Discord responded with HTTP \(statusCode) for this API call. Response body: \(body). The most likely cause is a missing permission, an unknown resource ID, or a rate-limit response that exceeded the retry policy."
         }
     }
 }

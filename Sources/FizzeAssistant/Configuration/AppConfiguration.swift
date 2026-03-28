@@ -66,23 +66,23 @@ struct BotConfigurationFile: Codable, Sendable {
             .map(\.0)
 
         guard missing.isEmpty else {
-            throw UserFacingError("Missing required configuration: \(missing.joined(separator: ", "))")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: the bot cannot start until these required values are filled in: \(missing.joined(separator: ", ")). The most likely cause is that `fizze-assistant.json` or `DISCORD_BOT_TOKEN` is still incomplete.")
         }
 
         guard !allowed_staff_role_ids.isEmpty else {
-            throw UserFacingError("Configure at least one staff role ID in the JSON config.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: `allowed_staff_role_ids` is empty in `fizze-assistant.json`, so staff commands would have no authorized roles. Add at least one staff role ID and try again.")
         }
 
         guard !allowed_config_role_ids.isEmpty else {
-            throw UserFacingError("Configure at least one config owner role ID in the JSON config.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: `allowed_config_role_ids` is empty in `fizze-assistant.json`, so `/config` would have no authorized owners. Add at least one config-owner role ID and try again.")
         }
 
         guard trigger_cooldown_seconds > 0 else {
-            throw UserFacingError("`trigger_cooldown_seconds` must be greater than zero.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: `trigger_cooldown_seconds` in `fizze-assistant.json` must be greater than zero. The most likely cause is a zero or negative number in the config file.")
         }
 
         guard leave_audit_log_lookback_seconds > 0 else {
-            throw UserFacingError("`leave_audit_log_lookback_seconds` must be greater than zero.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: `leave_audit_log_lookback_seconds` in `fizze-assistant.json` must be greater than zero. The most likely cause is a zero or negative number in the config file.")
         }
 
         return BotConfigurationFile(
@@ -147,7 +147,7 @@ struct BotConfigurationFile: Codable, Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(self)
         guard let string = String(data: data, encoding: .utf8) else {
-            throw UserFacingError("Failed to render configuration.")
+            throw UserFacingError("BotConfigurationFile.prettyPrintedJSON: the bot could not turn the current config into UTF-8 text for display. The most likely cause is unexpected encoded data in memory.")
         }
         return string
     }
@@ -295,7 +295,7 @@ actor ConfigurationStore {
             next.suggestions_channel_id = normalizeOptionalString(value)
         case .warn_users_via_dm:
             guard let parsed = Bool(value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-                throw UserFacingError("`\(setting.rawValue)` expects `true` or `false`.")
+                throw UserFacingError("ConfigurationStore.update: `\(setting.rawValue)` expects `true` or `false` in `/config set`. The most likely cause is that the value was typed as something else.")
             }
             next.warn_users_via_dm = parsed
         case .welcome_message:
@@ -314,12 +314,12 @@ actor ConfigurationStore {
             next.warning_dm_template = value
         case .trigger_cooldown_seconds:
             guard let parsed = Double(value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-                throw UserFacingError("`\(setting.rawValue)` expects a number.")
+                throw UserFacingError("ConfigurationStore.update: `\(setting.rawValue)` expects a number in `/config set`. The most likely cause is that the value was typed as text instead of digits.")
             }
             next.trigger_cooldown_seconds = parsed
         case .leave_audit_log_lookback_seconds:
             guard let parsed = Double(value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-                throw UserFacingError("`\(setting.rawValue)` expects a number.")
+                throw UserFacingError("ConfigurationStore.update: `\(setting.rawValue)` expects a number in `/config set`. The most likely cause is that the value was typed as text instead of digits.")
             }
             next.leave_audit_log_lookback_seconds = parsed
         }
@@ -382,7 +382,7 @@ actor ConfigurationStore {
     private func normalizedRequiredString(_ value: String, name: String) throws -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            throw UserFacingError("`\(name)` cannot be empty.")
+            throw UserFacingError("ConfigurationStore.normalizedRequiredString: `\(name)` cannot be empty. The most likely cause is that the command was submitted with a blank value.")
         }
         return trimmed
     }
