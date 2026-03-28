@@ -133,6 +133,11 @@ struct DiscordInteraction: Codable, Sendable {
 struct DiscordInteractionMember: Codable, Sendable {
     var user: DiscordUser?
     var roles: [DiscordSnowflake]
+    var permissions: String?
+
+    var permissionSet: PermissionSet {
+        PermissionSet(rawValue: UInt64(permissions ?? "") ?? 0)
+    }
 }
 
 struct DiscordInteractionData: Codable, Sendable {
@@ -301,6 +306,7 @@ enum DiscordGatewayOpCode {
 enum DiscordPermission: UInt64 {
     case viewChannel = 1024
     case sendMessages = 2048
+    case manageGuild = 32
     case manageRoles = 268435456
     case viewAuditLog = 128
     case administrator = 8

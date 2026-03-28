@@ -119,15 +119,13 @@ actor InteractionHandler {
     }
 
     private func ensureStaffAuthorized(member: DiscordInteractionMember?, configuration: AppConfiguration) throws {
-        let roles = Set(member?.roles ?? [])
-        guard !roles.isDisjoint(with: configuration.allowedStaffRoleIDs) else {
+        guard member?.isStaffAuthorized(for: configuration) == true else {
             throw UserFacingError("You are not allowed to use this command.")
         }
     }
 
     private func ensureConfigAuthorized(member: DiscordInteractionMember?, configuration: AppConfiguration) throws {
-        let roles = Set(member?.roles ?? [])
-        guard !roles.isDisjoint(with: configuration.allowedConfigRoleIDs) else {
+        guard member?.isConfigAuthorized(for: configuration) == true else {
             throw UserFacingError("You are not allowed to change the bot configuration.")
         }
     }
@@ -202,5 +200,20 @@ private extension JSONValue {
             }
             throw UserFacingError("Expected a string option value.")
         }
+    }
+}
+
+private extension DiscordInteractionMember {
+    func isStaffAuthorized(for configuration: AppConfiguration) -> Bool {
+        hasServerManagementPrivileges || !Set(roles).isDisjoint(with: configuration.allowedStaffRoleIDs)
+    }
+
+    func isConfigAuthorized(for configuration: AppConfiguration) -> Bool {
+        hasServerManagementPrivileges || !Set(roles).isDisjoint(with: configuration.allowedConfigRoleIDs)
+    }
+
+    var hasServerManagementPrivileges: Bool {
+        let permissions = permissionSet
+        return permissions.contains(.administrator) || permissions.contains(.manageGuild)
     }
 }

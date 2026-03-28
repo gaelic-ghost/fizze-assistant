@@ -150,6 +150,7 @@ struct PermissionSet: OptionSet, Sendable {
 
     static let viewChannel = PermissionSet(rawValue: DiscordPermission.viewChannel.rawValue)
     static let sendMessages = PermissionSet(rawValue: DiscordPermission.sendMessages.rawValue)
+    static let manageGuild = PermissionSet(rawValue: DiscordPermission.manageGuild.rawValue)
     static let manageRoles = PermissionSet(rawValue: DiscordPermission.manageRoles.rawValue)
     static let viewAuditLog = PermissionSet(rawValue: DiscordPermission.viewAuditLog.rawValue)
     static let administrator = PermissionSet(rawValue: DiscordPermission.administrator.rawValue)
