@@ -39,6 +39,8 @@
 - Prefer pure Swift solutions where practical.
 - For JSON or API boundary models, prefer the literal wire-format field names directly instead of local style remapping.
 - Do not add `CodingKeys` as stylistic translation glue. Only keep them for real protocol mismatches that cannot be expressed by naming the property after the serialized field.
+- Any setup issue that can be fixed from Discord itself must never be startup-blocking.
+- Operator-facing console and log messages should stay calm and actionable; avoid harsh failure phrasing when the bot is intentionally continuing in a degraded but expected state.
 
 ## Concurrency and Language Mode
 

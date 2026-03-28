@@ -65,9 +65,6 @@ enum BotApplication {
                 logger: configuredLogger
             ).build()
             print(report.renderText())
-            if report.hasBlockingIssue {
-                throw UserFacingError("Blocking setup issues were found. Fix them and rerun `fizze-assistant check`.")
-            }
 
         case .run:
             let report = try await PermissionReportBuilder(
@@ -77,9 +74,7 @@ enum BotApplication {
             ).build()
 
             print(report.renderText())
-            if report.hasBlockingIssue {
-                throw UserFacingError("Blocking setup issues were found. Fix them and rerun `fizze-assistant check`.")
-            }
+            print("Startup is continuing with the guidance above.")
 
             let bot = try await FizzeBot(
                 configurationStore: configurationStore,

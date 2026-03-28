@@ -4,13 +4,13 @@ import Testing
 
 struct PermissionReportTests {
     @Test
-    func blockingIssuesAreDetected() {
+    func setupReportUsesFriendlyWarningLanguage() {
         let report = PermissionReport(issues: [
             .init(severity: .info, message: "hello"),
-            .init(severity: .blocking, message: "bad"),
+            .init(severity: .warning, message: "Heads up"),
         ])
 
-        #expect(report.hasBlockingIssue)
-        #expect(report.renderText().contains("BLOCKING"))
+        #expect(report.renderText().contains("Startup can continue."))
+        #expect(report.renderText().contains("WARN"))
     }
 }

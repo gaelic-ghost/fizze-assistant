@@ -54,13 +54,8 @@ actor DiscordGatewayClient {
         self.logger = logger
         self.onEvent = onEvent
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        self.decoder = decoder
-
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        self.encoder = encoder
+        self.decoder = JSONDecoder()
+        self.encoder = JSONEncoder()
     }
 
     // MARK: Public API
@@ -107,7 +102,7 @@ actor DiscordGatewayClient {
         do {
             let delay = reconnectDelaySeconds(forAttempt: reconnectAttempt)
             if delay > 0 {
-                logger.warning("Reconnecting to Discord Gateway with backoff.", metadata: [
+                logger.warning("Discord Gateway is reconnecting with a short backoff.", metadata: [
                     "delay_seconds": .string(String(format: "%.2f", delay)),
                     "attempt": .string(String(reconnectAttempt + 1)),
                 ])
@@ -116,7 +111,7 @@ actor DiscordGatewayClient {
             reconnectAttempt += 1
             try await connect(using: targetURL)
         } catch {
-            logger.error("Failed to reconnect to Discord Gateway.", metadata: ["error": .string(String(describing: error))])
+            logger.warning("Discord Gateway did not reconnect on this attempt, but the bot will keep trying.", metadata: ["error": .string(String(describing: error))])
         }
     }
 
@@ -138,7 +133,7 @@ actor DiscordGatewayClient {
                 logger.debug("Gateway receive was cancelled.")
                 return
             } catch {
-                logger.error("Gateway receive failed; reconnecting.", metadata: ["error": .string(String(describing: error))])
+                logger.warning("Discord Gateway connection dropped, so the bot is opening a fresh connection.", metadata: ["error": .string(String(describing: error))])
                 await reconnect()
                 return
             }
@@ -182,7 +177,7 @@ actor DiscordGatewayClient {
         while isRunning {
             do {
                 if awaitingHeartbeatACK {
-                    logger.warning("Heartbeat ACK timed out; reconnecting.")
+                    logger.warning("Discord Gateway heartbeat timed out, so the bot is refreshing the connection.")
                     await reconnect()
                     return
                 }
@@ -197,7 +192,7 @@ actor DiscordGatewayClient {
             } catch is CancellationError {
                 return
             } catch {
-                logger.error("Heartbeat failed.", metadata: ["error": .string(String(describing: error))])
+                logger.warning("The Gateway heartbeat did not complete cleanly, so the bot is reopening the connection.", metadata: ["error": .string(String(describing: error))])
                 await reconnect()
                 return
             }

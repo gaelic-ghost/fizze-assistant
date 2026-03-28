@@ -238,7 +238,7 @@ enum RESTError: LocalizedError {
         case .invalidResponse:
             return "Discord returned an invalid response."
         case let .discordError(statusCode, body):
-            return "Discord API error \(statusCode): \(body)"
+            return "Discord responded with status \(statusCode). Details: \(body)"
         }
     }
 }

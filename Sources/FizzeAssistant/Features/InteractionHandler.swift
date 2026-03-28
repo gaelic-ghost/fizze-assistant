@@ -97,7 +97,7 @@ actor InteractionHandler {
                 try await respond(interaction, content: "That command isn't implemented yet.", ephemeral: true)
             }
         } catch {
-            logger.error("Failed to handle interaction.", metadata: ["error": .string(String(describing: error))])
+            logger.warning("A command ran into a problem, and the bot is sending a helpful reply if it can.", metadata: ["error": .string(String(describing: error))])
             try? await respond(
                 interaction,
                 content: (error as? LocalizedError)?.errorDescription ?? "I couldn't complete that command. Please check my permissions and configuration, then try again.",

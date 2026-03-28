@@ -86,7 +86,7 @@ actor FizzeBot {
                 try await handleMessageCreate(message)
             }
         } catch {
-            logger.error("Failed to process event.", metadata: ["error": .string(String(describing: error))])
+            logger.warning("One event did not complete cleanly, but the bot is still running.", metadata: ["error": .string(String(describing: error))])
         }
     }
 
@@ -103,14 +103,14 @@ actor FizzeBot {
             if let mod_log_channel_id = configuration.mod_log_channel_id {
                 try? await restClient.createMessage(channel_id: mod_log_channel_id, content: message)
             } else {
-                logger.warning("Mod log channel is not configured; skipping role assignment failure message.")
+                logger.warning("Mod log channel is not configured yet, so the role-assignment note will stay local for now.")
             }
             throw error
         }
 
         let welcome = TemplateRenderer.render(configuration.welcome_message, user: event.user, guildName: guildName)
         guard let welcome_channel_id = configuration.welcome_channel_id else {
-            logger.warning("Welcome channel is not configured; skipping welcome message.")
+            logger.warning("Welcome channel is not configured yet, so the welcome post will stay off for now.")
             return
         }
         try await restClient.createMessage(channel_id: welcome_channel_id, content: welcome)
@@ -127,7 +127,7 @@ actor FizzeBot {
         do {
             reason = try await classifier.classify(user_id: event.user.id)
         } catch {
-            logger.warning("Failed to classify member removal; using unknown fallback.", metadata: ["error": .string(String(describing: error))])
+            logger.warning("Departure classification was not available for this member, so the neutral leave message will be used.", metadata: ["error": .string(String(describing: error))])
             reason = .unknown
         }
 
@@ -145,7 +145,7 @@ actor FizzeBot {
 
         let announcement = TemplateRenderer.render(template, user: event.user, guildName: guildName)
         guard let leave_channel_id = configuration.leave_channel_id else {
-            logger.warning("Leave channel is not configured; skipping leave announcement.")
+            logger.warning("Leave channel is not configured yet, so departure posts will stay off for now.")
             return
         }
         try await restClient.createMessage(channel_id: leave_channel_id, content: announcement)
