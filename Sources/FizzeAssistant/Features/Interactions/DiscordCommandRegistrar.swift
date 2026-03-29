@@ -68,26 +68,31 @@ struct DiscordCommandRegistrar {
                     DiscordApplicationCommandOption(
                         type: 1,
                         name: "trigger-add",
-                        description: "Add or replace an exact-match trigger.",
+                        description: "Add or replace one iconic trigger response.",
                         required: nil,
                         channel_types: nil,
                         options: [
-                            DiscordApplicationCommandOption(type: 3, name: "trigger", description: "Exact phrase to match.", required: true, channel_types: nil, options: nil),
+                            DiscordApplicationCommandOption(type: 3, name: "trigger", description: "Trigger phrase to match.", required: true, channel_types: nil, options: nil),
                             DiscordApplicationCommandOption(type: 3, name: "response", description: "Message to send.", required: true, channel_types: nil, options: nil),
                         ]
                     ),
                     DiscordApplicationCommandOption(
                         type: 1,
                         name: "trigger-remove",
-                        description: "Remove an exact-match trigger.",
+                        description: "Remove one iconic trigger.",
                         required: nil,
                         channel_types: nil,
                         options: [
                             DiscordApplicationCommandOption(type: 3, name: "trigger", description: "Trigger phrase to remove.", required: true, channel_types: nil, options: nil),
                         ]
                     ),
-                    DiscordApplicationCommandOption(type: 1, name: "trigger-list", description: "List exact-match triggers.", required: nil, channel_types: nil, options: nil),
+                    DiscordApplicationCommandOption(type: 1, name: "trigger-list", description: "List iconic triggers and payload types.", required: nil, channel_types: nil, options: nil),
                 ]
+            ),
+            DiscordSlashCommand(
+                name: "this-is-iconic",
+                description: "Walk through a new iconic response in two quick steps.",
+                options: nil
             ),
         ]
 

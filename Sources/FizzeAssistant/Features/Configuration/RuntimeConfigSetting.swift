@@ -17,6 +17,7 @@ enum RuntimeConfigSetting: String, CaseIterable, Sendable {
     case warning_dm_template = "warning_dm_template"
     case trigger_cooldown_seconds = "trigger_cooldown_seconds"
     case leave_audit_log_lookback_seconds = "leave_audit_log_lookback_seconds"
+    case trigger_matching_mode = "trigger_matching_mode"
 
     // MARK: Public API
 

@@ -102,6 +102,11 @@ actor ConfigurationStore {
                 throw UserFacingError("ConfigurationStore.update: `\(setting.rawValue)` expects a number in `/config set`. The most likely cause is that the value was typed as text instead of digits.")
             }
             next.leave_audit_log_lookback_seconds = parsed
+        case .trigger_matching_mode:
+            guard let parsed = IconicTriggerMatchingMode(rawValue: value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) else {
+                throw UserFacingError("ConfigurationStore.update: `\(setting.rawValue)` expects either `exact` or `fuzze` in `/config set`. The most likely cause is that the value was typed as something else.")
+            }
+            next.trigger_matching_mode = parsed
         }
 
         configurationFile = try next.readyForRuntime(botToken: botToken.isEmpty ? "placeholder-token" : botToken)
@@ -113,8 +118,18 @@ actor ConfigurationStore {
         let normalizedTrigger = try IconicMessageConfiguration.normalizedTrigger(trigger)
         let normalizedResponse = try normalizedRequiredString(response, name: "response")
 
+        return try saveIconicMessage(
+            trigger: normalizedTrigger,
+            message: IconicMessageConfiguration(content: normalizedResponse, embeds: nil)
+        )
+    }
+
+    func saveIconicMessage(trigger: String, message: IconicMessageConfiguration) throws -> BotConfigurationFile {
+        let normalizedTrigger = try IconicMessageConfiguration.normalizedTrigger(trigger)
+        let normalizedMessage = try message.readyForRuntime(trigger: normalizedTrigger)
+
         var next = configurationFile
-        next.iconic_messages[normalizedTrigger] = IconicMessageConfiguration(content: normalizedResponse, embeds: nil)
+        next.iconic_messages[normalizedTrigger] = normalizedMessage
 
         configurationFile = try next.readyForRuntime(botToken: botToken.isEmpty ? "placeholder-token" : botToken)
         try persist(configurationFile: configurationFile)

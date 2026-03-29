@@ -32,6 +32,7 @@ struct AppConfigurationTests {
             warning_dm_template: "warn",
             trigger_cooldown_seconds: 30,
             leave_audit_log_lookback_seconds: 30,
+            trigger_matching_mode: .exact,
             iconic_messages: [:]
         )
 
@@ -48,6 +49,7 @@ struct AppConfigurationTests {
         #expect(configuration.allowed_config_role_ids == ["owner-a", "owner-b"])
         #expect(configuration.database_path == ".data/fizze-assistant.sqlite")
         #expect(configuration.suggestions_channel_id == "suggestions")
+        #expect(configuration.trigger_matching_mode == .exact)
         #expect(configuration.iconic_messages.isEmpty)
     }
 }

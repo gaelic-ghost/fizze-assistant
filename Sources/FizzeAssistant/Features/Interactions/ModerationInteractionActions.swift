@@ -4,7 +4,7 @@ extension DiscordInteractionRouter {
     // MARK: Moderation Commands
 
     func handleModerationCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration, guildName: String) async throws {
-        switch data.name {
+        switch data.name ?? "" {
         case "warn":
             try await handleWarnCommand(interaction, data: data, configuration: configuration, guildName: guildName)
         case "warns":
@@ -14,7 +14,7 @@ extension DiscordInteractionRouter {
         case "clear-warnings":
             try await handleClearWarningsCommand(interaction, data: data, configuration: configuration)
         default:
-            throw UserFacingError("DiscordInteractionRouter.handleModerationCommand: received unsupported moderation command `\(data.name)`. The most likely cause is that the slash commands in the server are out of date; rerun command registration.")
+            throw UserFacingError("DiscordInteractionRouter.handleModerationCommand: received unsupported moderation command `\(data.name ?? "<missing-name>")`. The most likely cause is that the slash commands in the server are out of date; rerun command registration.")
         }
     }
 

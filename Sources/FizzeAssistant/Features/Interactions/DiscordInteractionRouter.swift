@@ -8,6 +8,7 @@ actor DiscordInteractionRouter {
     let configurationStore: ConfigurationStore
     let warningStore: WarningStore
     let logger: Logger
+    let iconicWizardState = IconicWizardStateStore()
 
     // MARK: Lifecycle
 
@@ -21,36 +22,63 @@ actor DiscordInteractionRouter {
     // MARK: Public API
 
     func handle(_ interaction: DiscordInteraction, guildName: String) async {
-        guard interaction.type == 2, let data = interaction.data else {
+        guard let data = interaction.data else {
             return
         }
 
         do {
             let configuration = await configurationStore.currentConfiguration()
 
-            switch data.name {
-            case "say":
-                try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
-                try await handleSayCommand(interaction, data: data, configuration: configuration)
+            switch interaction.type {
+            case DiscordInteractionType.applicationCommand:
+                try await handleApplicationCommand(interaction, data: data, configuration: configuration, guildName: guildName)
 
-            case "warn", "warns", "clear-warning", "clear-warnings":
-                try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
-                try await handleModerationCommand(interaction, data: data, configuration: configuration, guildName: guildName)
+            case DiscordInteractionType.messageComponent:
+                try await handleMessageComponent(interaction, data: data, configuration: configuration)
 
-            case "config":
-                try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
-                try await handleConfigCommand(interaction, data: data)
+            case DiscordInteractionType.modalSubmit:
+                try await handleModalSubmit(interaction, data: data, configuration: configuration)
 
             default:
-                try await respond(to: interaction, content: "That command isn't implemented yet.", ephemeral: true)
+                return
             }
         } catch {
-            logger.warning("DiscordInteractionRouter.handle: a slash command hit an error path, and the bot is trying to return a human-readable reply instead of failing silently.", metadata: ["error": .string(String(describing: error))])
+            logger.warning("DiscordInteractionRouter.handle: an interaction hit an error path, and the bot is trying to return a human-readable reply instead of failing silently.", metadata: ["error": .string(String(describing: error))])
             try? await respond(
                 to: interaction,
-                content: (error as? LocalizedError)?.errorDescription ?? "DiscordInteractionRouter.handle: the command did not finish cleanly, so the bot sent this fallback reply instead. The most likely cause is a missing Discord permission or a configuration mismatch in `fizze-assistant.json`.",
+                content: (error as? LocalizedError)?.errorDescription ?? "DiscordInteractionRouter.handle: the interaction did not finish cleanly, so the bot sent this fallback reply instead. The most likely cause is a missing Discord permission, an expired wizard step, or a configuration mismatch in `fizze-assistant.json`.",
                 ephemeral: true
             )
+        }
+    }
+
+    // MARK: Private Helpers
+
+    private func handleApplicationCommand(
+        _ interaction: DiscordInteraction,
+        data: DiscordInteractionData,
+        configuration: AppConfiguration,
+        guildName: String
+    ) async throws {
+        switch data.name ?? "" {
+        case "say":
+            try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
+            try await handleSayCommand(interaction, data: data, configuration: configuration)
+
+        case "warn", "warns", "clear-warning", "clear-warnings":
+            try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
+            try await handleModerationCommand(interaction, data: data, configuration: configuration, guildName: guildName)
+
+        case "config":
+            try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
+            try await handleConfigCommand(interaction, data: data)
+
+        case "this-is-iconic":
+            try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
+            try await startThisIsIconicWizard(interaction)
+
+        default:
+            try await respond(to: interaction, content: "That command isn't implemented yet.", ephemeral: true)
         }
     }
 }

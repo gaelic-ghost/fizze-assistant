@@ -8,6 +8,7 @@ actor FizzeBot {
     private let restClient: DiscordRESTClient
     private let logger: Logger
     private let warningStore: WarningStore
+    private let interactionRouter: DiscordInteractionRouter
     private let cooldownStore = TriggerCooldownStore()
     private let banCache = ModerationEventCache()
     private let botUserID: String
@@ -23,6 +24,12 @@ actor FizzeBot {
         self.logger = logger
         let configuration = await configurationStore.currentConfiguration()
         self.warningStore = try WarningStore(path: configuration.database_path)
+        self.interactionRouter = DiscordInteractionRouter(
+            restClient: restClient,
+            configurationStore: configurationStore,
+            warningStore: self.warningStore,
+            logger: logger
+        )
         self.botUserID = try await restClient.getCurrentUser().id
 
         let guild = try await restClient.getGuild(id: configuration.guild_id)
@@ -74,13 +81,7 @@ actor FizzeBot {
                 await banCache.recordBan(for: ban.user.id)
 
             case let .interaction(interaction):
-                let handler = DiscordInteractionRouter(
-                    restClient: restClient,
-                    configurationStore: configurationStore,
-                    warningStore: warningStore,
-                    logger: logger
-                )
-                await handler.handle(interaction, guildName: guildName)
+                await interactionRouter.handle(interaction, guildName: guildName)
 
             case let .message(message):
                 try await handleMessageCreate(message)
@@ -162,7 +163,8 @@ actor FizzeBot {
         let engine = IconicResponseEngine(
             messagesByTrigger: configuration.iconic_messages,
             cooldownStore: cooldownStore,
-            cooldown: configuration.trigger_cooldown_seconds
+            cooldown: configuration.trigger_cooldown_seconds,
+            matchingMode: configuration.trigger_matching_mode
         )
         if let response = await engine.response(for: event.content) {
             try await restClient.createMessage(channel_id: event.channel_id, payload: response.discordMessageCreate)

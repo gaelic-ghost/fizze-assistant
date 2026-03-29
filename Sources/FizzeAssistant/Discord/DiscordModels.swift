@@ -103,9 +103,12 @@ struct DiscordInteractionMember: Codable, Sendable {
 }
 
 struct DiscordInteractionData: Codable, Sendable {
-    var id: DiscordSnowflake
-    var name: String
+    var id: DiscordSnowflake?
+    var name: String?
+    var custom_id: String?
+    var component_type: Int?
     var options: [DiscordInteractionOption]?
+    var components: [DiscordComponent]?
 }
 
 struct DiscordInteractionOption: Codable, Sendable {
@@ -120,6 +123,7 @@ struct DiscordMessageCreate: Codable, Sendable {
 
     var content: String?
     var embeds: [DiscordEmbed]?
+    var components: [DiscordComponent]?
     var flags: Int?
 }
 
@@ -152,6 +156,24 @@ struct DiscordEmbedImage: Codable, Hashable, Sendable {
 
 struct DiscordCreateDMRequest: Codable, Sendable {
     var recipient_id: DiscordSnowflake
+}
+
+struct DiscordComponent: Codable, Hashable, Sendable {
+    // MARK: Stored Properties
+
+    var type: Int
+    var components: [DiscordComponent]?
+    var custom_id: String?
+    var style: Int?
+    var label: String?
+    var title: String?
+    var description: String?
+    var value: String?
+    var url: String?
+    var placeholder: String?
+    var required: Bool?
+    var min_length: Int?
+    var max_length: Int?
 }
 
 // MARK: - Gateway Event Models
@@ -284,4 +306,31 @@ enum DiscordPermission: UInt64 {
     case manageRoles = 268435456
     case viewAuditLog = 128
     case administrator = 8
+}
+
+enum DiscordInteractionType {
+    static let ping = 1
+    static let applicationCommand = 2
+    static let messageComponent = 3
+    static let modalSubmit = 5
+}
+
+enum DiscordInteractionCallbackType {
+    static let channelMessageWithSource = 4
+    static let modal = 9
+}
+
+enum DiscordComponentType {
+    static let actionRow = 1
+    static let button = 2
+    static let textInput = 4
+}
+
+enum DiscordButtonStyle {
+    static let primary = 1
+}
+
+enum DiscordTextInputStyle {
+    static let short = 1
+    static let paragraph = 2
 }

@@ -12,7 +12,8 @@ struct IconicResponseEngineTests {
                 "fizze time": IconicMessageConfiguration(content: "sparkle", embeds: nil),
             ],
             cooldownStore: TriggerCooldownStore(),
-            cooldown: 30
+            cooldown: 30,
+            matchingMode: .exact
         )
 
         let response = await engine.response(for: "  FIZZE TIME ")
@@ -27,7 +28,8 @@ struct IconicResponseEngineTests {
                 "fizze time": IconicMessageConfiguration(content: "sparkle", embeds: nil),
             ],
             cooldownStore: store,
-            cooldown: 30
+            cooldown: 30,
+            matchingMode: .exact
         )
 
         _ = await engine.response(for: "fizze time")
@@ -55,11 +57,28 @@ struct IconicResponseEngineTests {
                 ),
             ],
             cooldownStore: TriggerCooldownStore(),
-            cooldown: 30
+            cooldown: 30,
+            matchingMode: .exact
         )
 
         let response = await engine.response(for: "fizze card")
         #expect(response?.content == nil)
         #expect(response?.embeds?.count == 1)
+    }
+
+    @Test
+    func fuzzeModeMatchesSubstringUsingLongestTrigger() async {
+        let engine = IconicResponseEngine(
+            messagesByTrigger: [
+                "fizze": IconicMessageConfiguration(content: "base", embeds: nil),
+                "fizze time": IconicMessageConfiguration(content: "longest", embeds: nil),
+            ],
+            cooldownStore: TriggerCooldownStore(),
+            cooldown: 30,
+            matchingMode: .fuzze
+        )
+
+        let response = await engine.response(for: "wow fizze time right now")
+        #expect(response?.content == "longest")
     }
 }

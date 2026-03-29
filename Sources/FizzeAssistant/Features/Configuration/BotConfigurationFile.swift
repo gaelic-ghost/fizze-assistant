@@ -23,6 +23,7 @@ struct BotConfigurationFile: Codable, Sendable {
     var warning_dm_template: String
     var trigger_cooldown_seconds: Double
     var leave_audit_log_lookback_seconds: Double
+    var trigger_matching_mode: IconicTriggerMatchingMode
     var iconic_messages: [String: IconicMessageConfiguration]
 
     // MARK: Defaults
@@ -48,6 +49,7 @@ struct BotConfigurationFile: Codable, Sendable {
         warning_dm_template: "You have been warned in {guild_name}: {reason}",
         trigger_cooldown_seconds: 30,
         leave_audit_log_lookback_seconds: 30,
+        trigger_matching_mode: .exact,
         iconic_messages: [:]
     )
 
@@ -106,6 +108,7 @@ struct BotConfigurationFile: Codable, Sendable {
             warning_dm_template: warning_dm_template,
             trigger_cooldown_seconds: trigger_cooldown_seconds,
             leave_audit_log_lookback_seconds: leave_audit_log_lookback_seconds,
+            trigger_matching_mode: trigger_matching_mode,
             iconic_messages: try Self.normalizedIconicMessages(iconic_messages)
         )
     }
@@ -199,6 +202,7 @@ struct AppConfiguration: Sendable {
     var warning_dm_template: String { file.warning_dm_template }
     var trigger_cooldown_seconds: Double { file.trigger_cooldown_seconds }
     var leave_audit_log_lookback_seconds: Double { file.leave_audit_log_lookback_seconds }
+    var trigger_matching_mode: IconicTriggerMatchingMode { file.trigger_matching_mode }
     var iconic_messages: [String: IconicMessageConfiguration] { file.iconic_messages }
 
     var say_success_message: String { "Sent." }
@@ -208,6 +212,13 @@ struct AppConfiguration: Sendable {
     var install_url: String {
         "https://discord.com/oauth2/authorize?client_id=\(application_id)&scope=bot%20applications.commands&permissions=\(Self.required_permission_integer)"
     }
+}
+
+enum IconicTriggerMatchingMode: String, Codable, CaseIterable, Sendable {
+    // MARK: Cases
+
+    case exact = "exact"
+    case fuzze = "fuzze"
 }
 
 struct IconicMessageConfiguration: Codable, Hashable, Sendable {

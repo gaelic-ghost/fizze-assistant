@@ -33,6 +33,7 @@ struct ConfigurationStoreTests {
             warning_dm_template: "Warn",
             trigger_cooldown_seconds: 30,
             leave_audit_log_lookback_seconds: 30,
+            trigger_matching_mode: .exact,
             iconic_messages: [:]
         )
 
@@ -47,12 +48,14 @@ struct ConfigurationStoreTests {
 
         _ = try await store.update(setting: .welcome_channel_id, value: "123456")
         _ = try await store.update(setting: .suggestions_channel_id, value: "654321")
+        _ = try await store.update(setting: .trigger_matching_mode, value: "fuzze")
         _ = try await store.addTrigger(trigger: "FIZZE TIME", response: "sparkle")
 
         let data = try Data(contentsOf: configURL)
         let runtime = try JSONDecoder().decode(BotConfigurationFile.self, from: data)
         #expect(runtime.welcome_channel_id == "123456")
         #expect(runtime.suggestions_channel_id == "654321")
+        #expect(runtime.trigger_matching_mode == .fuzze)
         #expect(runtime.iconic_messages["fizze time"]?.content == "sparkle")
     }
 
@@ -79,6 +82,7 @@ struct ConfigurationStoreTests {
             warning_dm_template: "Warn",
             trigger_cooldown_seconds: 30,
             leave_audit_log_lookback_seconds: 30,
+            trigger_matching_mode: .exact,
             iconic_messages: [
                 "  FIZZE TIME  ": IconicMessageConfiguration(content: "sparkle", embeds: nil),
             ]
@@ -111,6 +115,7 @@ struct ConfigurationStoreTests {
                 warning_dm_template: "Warn",
                 trigger_cooldown_seconds: 30,
                 leave_audit_log_lookback_seconds: 30,
+                trigger_matching_mode: .exact,
                 iconic_messages: [
                     "fizze void": IconicMessageConfiguration(content: nil, embeds: nil),
                 ]
