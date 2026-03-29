@@ -1,6 +1,47 @@
 import Foundation
 import Logging
 
+private enum EventHandlingError: LocalizedError {
+    // MARK: Cases
+
+    case memberJoinRoleAssignment(userID: DiscordSnowflake, roleID: DiscordSnowflake, guildID: DiscordSnowflake, underlying: Error)
+    case memberJoinRoleAssignmentNotice(channelID: DiscordSnowflake, userID: DiscordSnowflake, underlying: Error)
+    case memberJoinWelcomePost(channelID: DiscordSnowflake, userID: DiscordSnowflake, underlying: Error)
+    case memberRemovalAnnouncement(channelID: DiscordSnowflake, userID: DiscordSnowflake, reason: LeaveReason, underlying: Error)
+    case iconicMessageResponse(channelID: DiscordSnowflake, triggerText: String, underlying: Error)
+
+    // MARK: LocalizedError
+
+    var errorDescription: String? {
+        switch self {
+        case let .memberJoinRoleAssignment(userID, roleID, guildID, underlying):
+            return "FizzeBot.handleMemberJoined: the bot could not assign role `\(roleID)` to user `\(userID)` in guild `\(guildID)`. The most likely cause is that the bot role is missing `Manage Roles` or is still below the target role in the Discord role list. Underlying error: \(Self.describe(underlying))"
+
+        case let .memberJoinRoleAssignmentNotice(channelID, userID, underlying):
+            return "FizzeBot.handleMemberJoined: role assignment failed for user `\(userID)`, and the follow-up staff notice also could not be posted to mod-log channel `\(channelID)`. The most likely cause is that the bot cannot send messages in that channel. Underlying error: \(Self.describe(underlying))"
+
+        case let .memberJoinWelcomePost(channelID, userID, underlying):
+            return "FizzeBot.handleMemberJoined: the bot could not post the welcome message for user `\(userID)` to channel `\(channelID)`. The most likely cause is that the bot does not have `Send Messages` in the configured welcome channel. Underlying error: \(Self.describe(underlying))"
+
+        case let .memberRemovalAnnouncement(channelID, userID, reason, underlying):
+            return "FizzeBot.handleMemberRemoved: the bot could not post the `\(reason)` departure announcement for user `\(userID)` to channel `\(channelID)`. The most likely cause is that the bot does not have `Send Messages` in the configured leave channel. Underlying error: \(Self.describe(underlying))"
+
+        case let .iconicMessageResponse(channelID, triggerText, underlying):
+            return "FizzeBot.handleMessageCreate: the bot matched iconic trigger text `\(triggerText)` but could not post the response in channel `\(channelID)`. The most likely cause is that the bot does not have `Send Messages` in that channel, or an embed in the iconic response was rejected by Discord. Underlying error: \(Self.describe(underlying))"
+        }
+    }
+
+    // MARK: Private Helpers
+
+    private static func describe(_ error: Error) -> String {
+        if let localized = (error as? LocalizedError)?.errorDescription {
+            return localized
+        }
+
+        return String(describing: error)
+    }
+}
+
 actor FizzeBot {
     // MARK: Stored Properties
 
@@ -91,7 +132,10 @@ actor FizzeBot {
                 try await handleMessageCreate(message)
             }
         } catch {
-            logger.warning("FizzeBot.handle: one Discord event did not finish cleanly, but the bot is still online and ready for the next event.", metadata: ["error": .string(String(describing: error))])
+            logger.warning(
+                "FizzeBot.handle: one Discord event did not finish cleanly, but the bot is still online and ready for the next event.",
+                metadata: ["error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error))]
+            )
         }
     }
 
@@ -106,11 +150,26 @@ actor FizzeBot {
         } catch {
             let message = TemplateRenderer.render(configuration.role_assignment_failure_message, user: event.user, guildName: guildName)
             if let mod_log_channel_id = configuration.mod_log_channel_id {
-                try? await restClient.createMessage(channel_id: mod_log_channel_id, content: message)
+                do {
+                    try await restClient.createMessage(channel_id: mod_log_channel_id, content: message)
+                } catch {
+                    let noticeError = EventHandlingError.memberJoinRoleAssignmentNotice(
+                        channelID: mod_log_channel_id,
+                        userID: event.user.id,
+                        underlying: error
+                    )
+                    let noticeMessage = noticeError.errorDescription ?? "FizzeBot.handleMemberJoined: the role-assignment follow-up notice could not be posted to the mod log channel."
+                    logger.warning("\(noticeMessage)")
+                }
             } else {
                 logger.warning("FizzeBot.handleMemberJoined: the bot could not post the role-assignment note because `mod_log_channel_id` is still empty in `fizze-assistant.json`. The most likely cause is that the mod log channel has not been configured yet.")
             }
-            throw error
+            throw EventHandlingError.memberJoinRoleAssignment(
+                userID: event.user.id,
+                roleID: configuration.default_member_role_id,
+                guildID: configuration.guild_id,
+                underlying: error
+            )
         }
 
         let welcome = TemplateRenderer.render(configuration.welcome_message, user: event.user, guildName: guildName)
@@ -118,7 +177,15 @@ actor FizzeBot {
             logger.warning("FizzeBot.handleMemberJoined: the welcome post is paused because `welcome_channel_id` is still empty in `fizze-assistant.json`. The most likely cause is that the welcome channel has not been configured yet.")
             return
         }
-        try await restClient.createMessage(channel_id: welcome_channel_id, content: welcome)
+        do {
+            try await restClient.createMessage(channel_id: welcome_channel_id, content: welcome)
+        } catch {
+            throw EventHandlingError.memberJoinWelcomePost(
+                channelID: welcome_channel_id,
+                userID: event.user.id,
+                underlying: error
+            )
+        }
     }
 
     private func handleMemberRemoved(_ event: DiscordGuildMemberRemoveEvent) async throws {
@@ -153,7 +220,16 @@ actor FizzeBot {
             logger.warning("FizzeBot.handleMemberRemoved: departure posts are paused because `leave_channel_id` is still empty in `fizze-assistant.json`. The most likely cause is that the leave channel has not been configured yet.")
             return
         }
-        try await restClient.createMessage(channel_id: leave_channel_id, content: announcement)
+        do {
+            try await restClient.createMessage(channel_id: leave_channel_id, content: announcement)
+        } catch {
+            throw EventHandlingError.memberRemovalAnnouncement(
+                channelID: leave_channel_id,
+                userID: event.user.id,
+                reason: reason,
+                underlying: error
+            )
+        }
     }
 
     // MARK: Messaging Helpers
@@ -171,7 +247,15 @@ actor FizzeBot {
             matchingMode: configuration.trigger_matching_mode
         )
         if let response = await engine.response(for: event.content) {
-            try await restClient.createMessage(channel_id: event.channel_id, payload: response.discordMessageCreate)
+            do {
+                try await restClient.createMessage(channel_id: event.channel_id, payload: response.discordMessageCreate)
+            } catch {
+                throw EventHandlingError.iconicMessageResponse(
+                    channelID: event.channel_id,
+                    triggerText: event.content,
+                    underlying: error
+                )
+            }
         }
     }
 }
