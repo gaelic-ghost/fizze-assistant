@@ -32,4 +32,37 @@ struct BotConfigurationFileTests {
         let runtime = try configuration.readyForRuntime(botToken: "token")
         #expect(runtime.bot_mention_responses == ["Fizze Assistant, at your service, {user_mention}."])
     }
+
+    @Test
+    func decodingOlderConfigWithoutBotMentionResponsesUsesDefaults() throws {
+        let json = """
+        {
+          "allowed_config_role_ids": ["config-role"],
+          "allowed_staff_role_ids": ["staff-role"],
+          "application_id": "app",
+          "ban_message": "ban",
+          "database_path": ".data/fizze-assistant.sqlite",
+          "default_member_role_id": "member-role",
+          "guild_id": "guild",
+          "iconic_messages": {},
+          "kick_message": "kick",
+          "leave_audit_log_lookback_seconds": 30,
+          "leave_channel_id": null,
+          "mod_log_channel_id": null,
+          "role_assignment_failure_message": "role failure",
+          "suggestions_channel_id": null,
+          "trigger_cooldown_seconds": 30,
+          "trigger_matching_mode": "exact",
+          "unknown_removal_message": "unknown",
+          "voluntary_leave_message": "bye",
+          "warn_users_via_dm": false,
+          "warning_dm_template": "warn",
+          "welcome_channel_id": null,
+          "welcome_message": "hi"
+        }
+        """
+
+        let configuration = try JSONDecoder().decode(BotConfigurationFile.self, from: Data(json.utf8))
+        #expect(configuration.bot_mention_responses == BotConfigurationFile.defaults.bot_mention_responses)
+    }
 }

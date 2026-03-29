@@ -58,6 +58,88 @@ struct BotConfigurationFile: Codable, Sendable {
         iconic_messages: [:]
     )
 
+    // MARK: Lifecycle
+
+    init(
+        application_id: String,
+        guild_id: String,
+        default_member_role_id: String,
+        allowed_staff_role_ids: [String],
+        allowed_config_role_ids: [String],
+        database_path: String,
+        welcome_channel_id: String?,
+        leave_channel_id: String?,
+        mod_log_channel_id: String?,
+        suggestions_channel_id: String?,
+        warn_users_via_dm: Bool,
+        welcome_message: String,
+        voluntary_leave_message: String,
+        kick_message: String,
+        ban_message: String,
+        unknown_removal_message: String,
+        role_assignment_failure_message: String,
+        warning_dm_template: String,
+        bot_mention_responses: [String],
+        trigger_cooldown_seconds: Double,
+        leave_audit_log_lookback_seconds: Double,
+        trigger_matching_mode: IconicTriggerMatchingMode,
+        iconic_messages: [String: IconicMessageConfiguration]
+    ) {
+        self.application_id = application_id
+        self.guild_id = guild_id
+        self.default_member_role_id = default_member_role_id
+        self.allowed_staff_role_ids = allowed_staff_role_ids
+        self.allowed_config_role_ids = allowed_config_role_ids
+        self.database_path = database_path
+        self.welcome_channel_id = welcome_channel_id
+        self.leave_channel_id = leave_channel_id
+        self.mod_log_channel_id = mod_log_channel_id
+        self.suggestions_channel_id = suggestions_channel_id
+        self.warn_users_via_dm = warn_users_via_dm
+        self.welcome_message = welcome_message
+        self.voluntary_leave_message = voluntary_leave_message
+        self.kick_message = kick_message
+        self.ban_message = ban_message
+        self.unknown_removal_message = unknown_removal_message
+        self.role_assignment_failure_message = role_assignment_failure_message
+        self.warning_dm_template = warning_dm_template
+        self.bot_mention_responses = bot_mention_responses
+        self.trigger_cooldown_seconds = trigger_cooldown_seconds
+        self.leave_audit_log_lookback_seconds = leave_audit_log_lookback_seconds
+        self.trigger_matching_mode = trigger_matching_mode
+        self.iconic_messages = iconic_messages
+    }
+
+    // MARK: Codable
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        application_id = try container.decode(String.self, forKey: .application_id)
+        guild_id = try container.decode(String.self, forKey: .guild_id)
+        default_member_role_id = try container.decode(String.self, forKey: .default_member_role_id)
+        allowed_staff_role_ids = try container.decode([String].self, forKey: .allowed_staff_role_ids)
+        allowed_config_role_ids = try container.decode([String].self, forKey: .allowed_config_role_ids)
+        database_path = try container.decode(String.self, forKey: .database_path)
+        welcome_channel_id = try container.decodeIfPresent(String.self, forKey: .welcome_channel_id)
+        leave_channel_id = try container.decodeIfPresent(String.self, forKey: .leave_channel_id)
+        mod_log_channel_id = try container.decodeIfPresent(String.self, forKey: .mod_log_channel_id)
+        suggestions_channel_id = try container.decodeIfPresent(String.self, forKey: .suggestions_channel_id)
+        warn_users_via_dm = try container.decode(Bool.self, forKey: .warn_users_via_dm)
+        welcome_message = try container.decode(String.self, forKey: .welcome_message)
+        voluntary_leave_message = try container.decode(String.self, forKey: .voluntary_leave_message)
+        kick_message = try container.decode(String.self, forKey: .kick_message)
+        ban_message = try container.decode(String.self, forKey: .ban_message)
+        unknown_removal_message = try container.decode(String.self, forKey: .unknown_removal_message)
+        role_assignment_failure_message = try container.decode(String.self, forKey: .role_assignment_failure_message)
+        warning_dm_template = try container.decode(String.self, forKey: .warning_dm_template)
+        bot_mention_responses = try container.decodeIfPresent([String].self, forKey: .bot_mention_responses) ?? Self.defaults.bot_mention_responses
+        trigger_cooldown_seconds = try container.decode(Double.self, forKey: .trigger_cooldown_seconds)
+        leave_audit_log_lookback_seconds = try container.decode(Double.self, forKey: .leave_audit_log_lookback_seconds)
+        trigger_matching_mode = try container.decode(IconicTriggerMatchingMode.self, forKey: .trigger_matching_mode)
+        iconic_messages = try container.decode([String: IconicMessageConfiguration].self, forKey: .iconic_messages)
+    }
+
     // MARK: Validation
 
     func readyForRuntime(botToken: String) throws -> BotConfigurationFile {
