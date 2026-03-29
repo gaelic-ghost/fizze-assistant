@@ -10,8 +10,8 @@ struct DiscordCommandRegistrar {
 
     // MARK: Public API
 
-    func registerGuildCommands() async throws {
-        let commands = [
+    var guildCommands: [DiscordSlashCommand] {
+        [
             DiscordSlashCommand(
                 name: "say",
                 description: "Speak through the bot in another channel.",
@@ -95,6 +95,10 @@ struct DiscordCommandRegistrar {
                 options: nil
             ),
         ]
+    }
+
+    func registerGuildCommands() async throws {
+        let commands = guildCommands
 
         try await restClient.upsertGuildCommands(
             application_id: configuration.application_id,

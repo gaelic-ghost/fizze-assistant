@@ -5,7 +5,7 @@ struct DiscordRESTClient {
     // MARK: Stored Properties
 
     private let token: String
-    private let baseURL = URL(string: "https://discord.com/api/v10")!
+    private let baseURL: URL
     private let logger: Logger
     private let session: URLSession
     private let encoder: JSONEncoder
@@ -15,9 +15,19 @@ struct DiscordRESTClient {
     // MARK: Lifecycle
 
     init(token: String, logger: Logger) {
+        self.init(
+            token: token,
+            logger: logger,
+            session: URLSession(configuration: .ephemeral),
+            baseURL: URL(string: "https://discord.com/api/v10")!
+        )
+    }
+
+    init(token: String, logger: Logger, session: URLSession, baseURL: URL) {
         self.token = token
         self.logger = logger
-        self.session = URLSession(configuration: .ephemeral)
+        self.session = session
+        self.baseURL = baseURL
 
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()

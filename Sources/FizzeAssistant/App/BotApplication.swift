@@ -1,6 +1,27 @@
 import Foundation
 import Logging
 
+enum LoggingBootstrapState {
+    actor State {
+        // MARK: Stored Properties
+
+        private var isConfigured = false
+
+        // MARK: Public API
+
+        func bootstrapIfNeeded() {
+            guard !isConfigured else {
+                return
+            }
+
+            LoggingSystem.bootstrap(StreamLogHandler.standardError)
+            isConfigured = true
+        }
+    }
+
+    static let shared = State()
+}
+
 enum AppCommand {
     // MARK: Cases
 
@@ -16,7 +37,7 @@ enum BotApplication {
     // MARK: Entry Point
 
     static func run(command: AppCommand, options: SharedOptions) async throws {
-        LoggingSystem.bootstrap(StreamLogHandler.standardError)
+        await LoggingBootstrapState.shared.bootstrapIfNeeded()
 
         var configuredLogger = Logger(label: "fizze-assistant")
         configuredLogger[metadataKey: "command"] = .string(String(describing: command))

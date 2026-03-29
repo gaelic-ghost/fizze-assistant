@@ -2,8 +2,63 @@ import Foundation
 import Testing
 @testable import FizzeAssistant
 
+@Suite(.serialized)
 struct DiscordRESTClientTests {
     // MARK: Tests
+
+    @Test
+    func createMessageSendsBotAuthorizedJSONPayload() async throws {
+        let stub = makeDiscordRESTClient { request in
+            #expect(request.url?.path == "/api/v10/channels/channel-1/messages")
+            #expect(request.httpMethod == "POST")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bot token")
+
+            let payload = try decodeRequestBody(DiscordMessageCreate.self, from: request)
+            #expect(payload.content == "sparkle")
+            #expect(payload.flags == 64)
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+
+        try await stub.client.createMessage(channel_id: "channel-1", content: "sparkle", flags: 64)
+    }
+
+    @Test
+    func createInteractionResponseOmitsBotAuthorization() async throws {
+        let stub = makeDiscordRESTClient { request in
+            #expect(request.url?.path == "/api/v10/interactions/interaction-1/token-interaction-1/callback")
+            #expect(request.httpMethod == "POST")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+
+            let payload = try decodeRequestBody(InteractionCallbackPayload.self, from: request)
+            #expect(payload.type == DiscordInteractionCallbackType.channelMessageWithSource)
+            #expect(payload.data?.content == "hello")
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+
+        try await stub.client.createInteractionResponse(
+            interaction_id: "interaction-1",
+            token: "token-interaction-1",
+            payload: InteractionCallbackPayload(
+                type: DiscordInteractionCallbackType.channelMessageWithSource,
+                data: DiscordInteractionCallbackData(
+                    content: "hello",
+                    embeds: nil,
+                    components: nil,
+                    flags: 64,
+                    custom_id: nil,
+                    title: nil
+                )
+            )
+        )
+    }
 
     @Test
     func rateLimitDelayPrefersRetryAfterHeader() {

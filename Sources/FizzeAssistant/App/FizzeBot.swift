@@ -66,6 +66,10 @@ actor FizzeBot {
         await gatewayClient?.stop()
     }
 
+    func handleEventForTesting(_ event: DiscordGatewayClient.Event) async {
+        await handle(event)
+    }
+
     // MARK: Event Handling
 
     private func handle(_ event: DiscordGatewayClient.Event) async {
