@@ -10,7 +10,8 @@
 - Auto-assigns a configured member role on join
 - Provides staff slash commands for `/say`, `/warn`, `/warns`, `/clear-warning`, and `/clear-warnings`
 - Provides config-owner slash commands under `/config` for safe runtime config changes
-- Sends exact-match “iconic” auto-replies for configured trigger phrases
+- Sends configurable “iconic” auto-replies using either exact-match or broader `fuzze` substring matching
+- Can create new embed-backed iconic responses directly from Discord with `/this-is-iconic`
 - Stores warning history in SQLite and keeps other server state in Discord
 
 ## Why This Shape
@@ -65,6 +66,11 @@ The bot now uses one committed JSON config file for all non-secret settings:
 
 That file holds the Discord IDs, channel settings, role gates, message templates, and trigger configuration. The only secret that stays outside git is the bot token.
 
+For iconic responses, the committed config now includes:
+
+- `trigger_matching_mode` with `exact` and `fuzze`
+- `iconic_messages`, keyed by normalized trigger text
+
 `DISCORD_BOT_TOKEN` stays environment-only and is never editable from Discord.
 
 On a deployment machine such as the Mac mini, you can also keep the token in `.env.local`:
@@ -107,11 +113,19 @@ Discord-side runtime config commands:
 
 - `/config show`
 - `/config set setting:<key> value:<value>`
-- `/config trigger-add trigger:<exact phrase> response:<message>`
-- `/config trigger-remove trigger:<exact phrase>`
+- `/config trigger-add trigger:<phrase> response:<message>`
+- `/config trigger-remove trigger:<phrase>`
 - `/config trigger-list`
+- `/this-is-iconic`
 
-Simple text iconic messages can be added from Discord with `/config trigger-add`. Richer iconic messages that include embeds are stored directly in `fizze-assistant.json` under `iconic_messages`, keyed by normalized trigger text.
+Simple text iconic messages can still be added from Discord with `/config trigger-add`. `/config set` can also update `trigger_matching_mode` to either `exact` or `fuzze`, and `/config trigger-list` now shows the current matching mode plus each trigger's payload type.
+
+For richer iconic messages, `/this-is-iconic` walks through a two-step Discord-native flow:
+
+1. It asks for the trigger text and normalizes it before saving.
+2. It asks for the iconic content text, keeps that text verbatim as embed description, and uses the first URL in the text as the embed image when one is present.
+
+The resulting iconic message is saved under `iconic_messages` in `fizze-assistant.json`, keyed by normalized trigger text. Hand-editing that JSON is still the escape hatch for any richer embed payloads you want to author manually.
 
 Only the dedicated config-owner roles may use `/config`. Normal staff roles can still use the moderation and `/say` commands, but they cannot change bot configuration.
 
@@ -159,6 +173,7 @@ That keeps the process easy to start over SSH without committing to a larger dep
 - Warning history is stored locally in SQLite at the configured database path.
 - Discord-owned state like members, roles, channels, and moderation context stays in Discord.
 - Leave vs. kick vs. ban detection is best-effort from moderation events and audit-log timing.
+- `this-is-iconic` uses a short-lived in-memory draft between its modal steps, so a stale or abandoned wizard needs to be restarted from the slash command.
 - Runtime config changes are limited to a narrow allowlist of non-secret values, even though the broader non-secret baseline now lives in the committed `fizze-assistant.json` file.
 - Command authorization is enforced by the bot itself; this project does not currently configure Discord’s separate per-command permission system.
 - This repo is intentionally a one-off bot project for a specific friends’ server, not a reusable multi-server bot framework.

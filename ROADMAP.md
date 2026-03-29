@@ -27,8 +27,9 @@ Scope:
 
 Tickets:
 
-- [x] Implement welcome messages, leave announcements, auto-role assignment, warnings, `/say`, and exact-match iconic responses.
+- [x] Implement welcome messages, leave announcements, auto-role assignment, warnings, `/say`, and iconic responses with configurable matching modes.
 - [x] Add runtime config management with local persistence and Discord-side `/config` subcommands.
+- [x] Add embed-capable iconic message storage plus the `/this-is-iconic` creation flow.
 - [x] Add `check`, `register-commands`, `setup.sh`, `start-nohup.sh`, and `stop.sh` for SSH-friendly operations.
 - [x] Allow native Discord `Administrator` and `Manage Server` members to use bot admin/config commands.
 
@@ -91,6 +92,6 @@ Exit criteria:
 
 ## Backlog candidates
 
-- [ ] Add richer message-template controls such as configurable variants or embeds if the server actually wants them.
+- [ ] Add richer iconic authoring controls if the server wants more than the current text-plus-first-image flow.
 - [ ] Add optional command-registration diffing or clearer idempotency messaging during startup.
 - [ ] Add a simple health/status helper command for SSH operators if routine maintenance starts to feel opaque.
