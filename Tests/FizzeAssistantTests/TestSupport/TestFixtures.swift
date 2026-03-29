@@ -28,6 +28,7 @@ func makeConfigurationFile(rootURL: URL, overrides: (inout BotConfigurationFile)
         unknown_removal_message: "{username} left or was removed.",
         role_assignment_failure_message: "Could not assign role to {user_mention}.",
         warning_dm_template: "Warning in {guild_name}: {reason}",
+        bot_mention_responses: ["Fizze Assistant, at your service, {user_mention}."],
         trigger_cooldown_seconds: 30,
         leave_audit_log_lookback_seconds: 30,
         trigger_matching_mode: .exact,

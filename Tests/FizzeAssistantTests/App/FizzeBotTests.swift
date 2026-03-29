@@ -45,6 +45,162 @@ struct FizzeBotTests {
     }
 
     @Test
+    func botMentionSendsConfiguredReply() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            try stubBotRequest(request)
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.bot_mention_responses = ["Fizze Assistant, at your service, {user_mention}."]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-1",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "hello <@bot-user>",
+                    author: DiscordUser(id: "friend-2", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+
+        let messageRequest = try #require(
+            stub.requests().last(where: { $0.url?.path == "/api/v10/channels/source-channel/messages" })
+        )
+        let payload = try decodeRequestBody(DiscordMessageCreate.self, from: messageRequest)
+        #expect(payload.content == "Fizze Assistant, at your service, <@friend-2>.")
+    }
+
+    @Test
+    func botNicknameMentionSendsConfiguredReply() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            try stubBotRequest(request)
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.bot_mention_responses = ["*robot noises*"]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-2",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "hello <@!bot-user>",
+                    author: DiscordUser(id: "friend-3", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+
+        let messageRequest = try #require(
+            stub.requests().last(where: { $0.url?.path == "/api/v10/channels/source-channel/messages" })
+        )
+        let payload = try decodeRequestBody(DiscordMessageCreate.self, from: messageRequest)
+        #expect(payload.content == "*robot noises*")
+    }
+
+    @Test
+    func mentionCooldownSuppressesSecondImmediateReply() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            try stubBotRequest(request)
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.bot_mention_responses = ["hello {user_mention}"]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-3",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "hello <@bot-user>",
+                    author: DiscordUser(id: "friend-4", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-4",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "hello again <@bot-user>",
+                    author: DiscordUser(id: "friend-5", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+
+        let messageRequests = stub.requests().filter { $0.url?.path == "/api/v10/channels/source-channel/messages" }
+        #expect(messageRequests.count == 1)
+    }
+
+    @Test
+    func iconicTriggerTakesPrecedenceOverMentionReply() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            try stubBotRequest(request)
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.bot_mention_responses = ["hello {user_mention}"]
+                configuration.iconic_messages = [
+                    "<@bot-user>": IconicMessageConfiguration(content: "iconic sparkle", embeds: nil),
+                ]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-5",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "<@bot-user>",
+                    author: DiscordUser(id: "friend-6", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+
+        let messageRequest = try #require(
+            stub.requests().last(where: { $0.url?.path == "/api/v10/channels/source-channel/messages" })
+        )
+        let payload = try decodeRequestBody(DiscordMessageCreate.self, from: messageRequest)
+        #expect(payload.content == "iconic sparkle")
+    }
+
+    @Test
     func memberJoinAssignsRoleAndPostsWelcome() async throws {
         let rootURL = try makeTemporaryTestDirectory()
         let stub = makeDiscordRESTClient { request in

@@ -21,6 +21,7 @@ struct BotConfigurationFile: Codable, Sendable {
     var unknown_removal_message: String
     var role_assignment_failure_message: String
     var warning_dm_template: String
+    var bot_mention_responses: [String]
     var trigger_cooldown_seconds: Double
     var leave_audit_log_lookback_seconds: Double
     var trigger_matching_mode: IconicTriggerMatchingMode
@@ -47,6 +48,10 @@ struct BotConfigurationFile: Codable, Sendable {
         unknown_removal_message: "{username} left or was removed from the server.",
         role_assignment_failure_message: "I couldn't assign the default member role to {user_mention}. Please check role hierarchy and `Manage Roles` permissions.",
         warning_dm_template: "You have been warned in {guild_name}: {reason}",
+        bot_mention_responses: [
+            "Fizze Assistant, at your service, {user_mention}.",
+            "*robot noises*",
+        ],
         trigger_cooldown_seconds: 30,
         leave_audit_log_lookback_seconds: 30,
         trigger_matching_mode: .exact,
@@ -106,6 +111,7 @@ struct BotConfigurationFile: Codable, Sendable {
             unknown_removal_message: unknown_removal_message,
             role_assignment_failure_message: role_assignment_failure_message,
             warning_dm_template: warning_dm_template,
+            bot_mention_responses: Self.normalizedMessageTemplates(bot_mention_responses),
             trigger_cooldown_seconds: trigger_cooldown_seconds,
             leave_audit_log_lookback_seconds: leave_audit_log_lookback_seconds,
             trigger_matching_mode: trigger_matching_mode,
@@ -164,6 +170,12 @@ struct BotConfigurationFile: Codable, Sendable {
         return raw
     }
 
+    private static func normalizedMessageTemplates(_ values: [String]) -> [String] {
+        values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     private static func normalizedIconicMessages(_ messages: [String: IconicMessageConfiguration]) throws -> [String: IconicMessageConfiguration] {
         var normalized: [String: IconicMessageConfiguration] = [:]
         for (trigger, message) in messages {
@@ -200,6 +212,7 @@ struct AppConfiguration: Sendable {
     var unknown_removal_message: String { file.unknown_removal_message }
     var role_assignment_failure_message: String { file.role_assignment_failure_message }
     var warning_dm_template: String { file.warning_dm_template }
+    var bot_mention_responses: [String] { file.bot_mention_responses }
     var trigger_cooldown_seconds: Double { file.trigger_cooldown_seconds }
     var leave_audit_log_lookback_seconds: Double { file.leave_audit_log_lookback_seconds }
     var trigger_matching_mode: IconicTriggerMatchingMode { file.trigger_matching_mode }

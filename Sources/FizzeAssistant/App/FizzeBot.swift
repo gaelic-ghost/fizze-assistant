@@ -45,6 +45,8 @@ private enum EventHandlingError: LocalizedError {
 actor FizzeBot {
     // MARK: Stored Properties
 
+    private static let mentionReplyCooldownKey = "__bot_mention_reply__"
+
     private let configurationStore: ConfigurationStore
     private let restClient: DiscordRESTClient
     private let logger: Logger
@@ -247,15 +249,47 @@ actor FizzeBot {
             matchingMode: configuration.trigger_matching_mode
         )
         if let response = await engine.response(for: event.content) {
-            do {
-                try await restClient.createMessage(channel_id: event.channel_id, payload: response.discordMessageCreate)
-            } catch {
-                throw EventHandlingError.iconicMessageResponse(
-                    channelID: event.channel_id,
-                    triggerText: event.content,
-                    underlying: error
-                )
-            }
+            try await sendIconicMessageResponse(response, for: event)
+            return
         }
+
+        guard containsBotMention(in: event.content) else { return }
+        guard
+            let template = configuration.bot_mention_responses.randomElement(),
+            await cooldownStore.canFire(trigger: Self.mentionReplyCooldownKey, cooldown: configuration.trigger_cooldown_seconds)
+        else {
+            return
+        }
+
+        let response = TemplateRenderer.render(template, user: event.author, guildName: guildName)
+        try await sendMentionResponse(response, for: event)
+    }
+
+    private func sendIconicMessageResponse(_ response: IconicMessageConfiguration, for event: DiscordMessageEvent) async throws {
+        do {
+            try await restClient.createMessage(channel_id: event.channel_id, payload: response.discordMessageCreate)
+        } catch {
+            throw EventHandlingError.iconicMessageResponse(
+                channelID: event.channel_id,
+                triggerText: event.content,
+                underlying: error
+            )
+        }
+    }
+
+    private func sendMentionResponse(_ response: String, for event: DiscordMessageEvent) async throws {
+        do {
+            try await restClient.createMessage(channel_id: event.channel_id, content: response)
+        } catch {
+            throw EventHandlingError.iconicMessageResponse(
+                channelID: event.channel_id,
+                triggerText: event.content,
+                underlying: error
+            )
+        }
+    }
+
+    private func containsBotMention(in content: String) -> Bool {
+        content.contains("<@\(botUserID)>") || content.contains("<@!\(botUserID)>")
     }
 }

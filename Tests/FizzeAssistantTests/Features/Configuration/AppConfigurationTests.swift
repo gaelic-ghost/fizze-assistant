@@ -30,6 +30,7 @@ struct AppConfigurationTests {
             unknown_removal_message: "unknown",
             role_assignment_failure_message: "role failure",
             warning_dm_template: "warn",
+            bot_mention_responses: ["hello {user_mention}"],
             trigger_cooldown_seconds: 30,
             leave_audit_log_lookback_seconds: 30,
             trigger_matching_mode: .exact,
@@ -51,5 +52,6 @@ struct AppConfigurationTests {
         #expect(configuration.suggestions_channel_id == "suggestions")
         #expect(configuration.trigger_matching_mode == .exact)
         #expect(configuration.iconic_messages.isEmpty)
+        #expect(configuration.bot_mention_responses == ["hello {user_mention}"])
     }
 }

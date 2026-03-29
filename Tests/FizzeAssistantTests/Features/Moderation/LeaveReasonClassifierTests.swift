@@ -31,6 +31,7 @@ struct LeaveReasonClassifierTests {
                 unknown_removal_message: "Unknown",
                 role_assignment_failure_message: "Role failure",
                 warning_dm_template: "Warn",
+                bot_mention_responses: ["hello"],
                 trigger_cooldown_seconds: 30,
                 leave_audit_log_lookback_seconds: 30,
                 trigger_matching_mode: .exact,
