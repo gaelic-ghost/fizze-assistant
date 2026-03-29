@@ -33,7 +33,7 @@ struct ConfigurationStoreTests {
             warning_dm_template: "Warn",
             trigger_cooldown_seconds: 30,
             leave_audit_log_lookback_seconds: 30,
-            iconic_triggers: []
+            iconic_messages: [:]
         )
 
         let encoder = JSONEncoder()
@@ -47,12 +47,74 @@ struct ConfigurationStoreTests {
 
         _ = try await store.update(setting: .welcome_channel_id, value: "123456")
         _ = try await store.update(setting: .suggestions_channel_id, value: "654321")
-        _ = try await store.addTrigger(trigger: "fizze time", response: "sparkle")
+        _ = try await store.addTrigger(trigger: "FIZZE TIME", response: "sparkle")
 
         let data = try Data(contentsOf: configURL)
         let runtime = try JSONDecoder().decode(BotConfigurationFile.self, from: data)
         #expect(runtime.welcome_channel_id == "123456")
         #expect(runtime.suggestions_channel_id == "654321")
-        #expect(runtime.iconic_triggers.count == 1)
+        #expect(runtime.iconic_messages["fizze time"]?.content == "sparkle")
+    }
+
+    @Test
+    func runtimeValidationNormalizesAndValidatesIconicMessages() throws {
+        let runtime = try BotConfigurationFile(
+            application_id: "app",
+            guild_id: "guild",
+            default_member_role_id: "member",
+            allowed_staff_role_ids: ["staff"],
+            allowed_config_role_ids: ["owner"],
+            database_path: ".data/fizze-assistant.sqlite",
+            welcome_channel_id: nil,
+            leave_channel_id: nil,
+            mod_log_channel_id: nil,
+            suggestions_channel_id: nil,
+            warn_users_via_dm: false,
+            welcome_message: "Welcome",
+            voluntary_leave_message: "Bye",
+            kick_message: "Kick",
+            ban_message: "Ban",
+            unknown_removal_message: "Unknown",
+            role_assignment_failure_message: "Role failure",
+            warning_dm_template: "Warn",
+            trigger_cooldown_seconds: 30,
+            leave_audit_log_lookback_seconds: 30,
+            iconic_messages: [
+                "  FIZZE TIME  ": IconicMessageConfiguration(content: "sparkle", embeds: nil),
+            ]
+        ).readyForRuntime(botToken: "token")
+
+        #expect(runtime.iconic_messages["fizze time"]?.content == "sparkle")
+    }
+
+    @Test
+    func runtimeValidationRejectsEmptyIconicMessagePayload() {
+        #expect(throws: UserFacingError.self) {
+            _ = try BotConfigurationFile(
+                application_id: "app",
+                guild_id: "guild",
+                default_member_role_id: "member",
+                allowed_staff_role_ids: ["staff"],
+                allowed_config_role_ids: ["owner"],
+                database_path: ".data/fizze-assistant.sqlite",
+                welcome_channel_id: nil,
+                leave_channel_id: nil,
+                mod_log_channel_id: nil,
+                suggestions_channel_id: nil,
+                warn_users_via_dm: false,
+                welcome_message: "Welcome",
+                voluntary_leave_message: "Bye",
+                kick_message: "Kick",
+                ban_message: "Ban",
+                unknown_removal_message: "Unknown",
+                role_assignment_failure_message: "Role failure",
+                warning_dm_template: "Warn",
+                trigger_cooldown_seconds: 30,
+                leave_audit_log_lookback_seconds: 30,
+                iconic_messages: [
+                    "fizze void": IconicMessageConfiguration(content: nil, embeds: nil),
+                ]
+            ).readyForRuntime(botToken: "token")
+        }
     }
 }

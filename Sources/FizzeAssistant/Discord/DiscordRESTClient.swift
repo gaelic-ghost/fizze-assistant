@@ -53,9 +53,15 @@ struct DiscordRESTClient {
         _ = try await emptyRequest(path: "/guilds/\(guild_id)/members/\(user_id)/roles/\(role_id)", method: "PUT")
     }
 
-    func createMessage(channel_id: DiscordSnowflake, content: String, flags: Int? = nil) async throws {
-        let payload = DiscordMessageCreate(content: content, flags: flags)
+    func createMessage(channel_id: DiscordSnowflake, payload: DiscordMessageCreate) async throws {
         _ = try await emptyRequest(path: "/channels/\(channel_id)/messages", method: "POST", body: payload)
+    }
+
+    func createMessage(channel_id: DiscordSnowflake, content: String, flags: Int? = nil) async throws {
+        try await createMessage(
+            channel_id: channel_id,
+            payload: DiscordMessageCreate(content: content, embeds: nil, flags: flags)
+        )
     }
 
     func createDMChannel(recipient_id: DiscordSnowflake) async throws -> DiscordChannel {

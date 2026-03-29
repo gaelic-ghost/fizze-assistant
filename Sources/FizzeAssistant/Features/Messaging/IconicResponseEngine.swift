@@ -21,22 +21,22 @@ actor TriggerCooldownStore {
 struct IconicResponseEngine {
     // MARK: Stored Properties
 
-    let triggers: [IconicTriggerConfiguration]
+    let messagesByTrigger: [String: IconicMessageConfiguration]
     let cooldownStore: TriggerCooldownStore
     let cooldown: TimeInterval
 
     // MARK: Public API
 
-    func response(for content: String) async -> String? {
+    func response(for content: String) async -> IconicMessageConfiguration? {
         let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard let match = triggers.first(where: { $0.trigger.lowercased() == normalized }) else {
+        guard let match = messagesByTrigger[normalized] else {
             return nil
         }
 
-        guard await cooldownStore.canFire(trigger: match.trigger, cooldown: cooldown) else {
+        guard await cooldownStore.canFire(trigger: normalized, cooldown: cooldown) else {
             return nil
         }
 
-        return match.response
+        return match
     }
 }

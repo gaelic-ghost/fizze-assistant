@@ -33,7 +33,7 @@ struct LeaveReasonClassifierTests {
                 warning_dm_template: "Warn",
                 trigger_cooldown_seconds: 30,
                 leave_audit_log_lookback_seconds: 30,
-                iconic_triggers: []
+                iconic_messages: [:]
             ),
         )
 

@@ -116,8 +116,38 @@ struct DiscordInteractionOption: Codable, Sendable {
 }
 
 struct DiscordMessageCreate: Codable, Sendable {
-    var content: String
+    // MARK: Stored Properties
+
+    var content: String?
+    var embeds: [DiscordEmbed]?
     var flags: Int?
+}
+
+struct DiscordEmbed: Codable, Hashable, Sendable {
+    // MARK: Stored Properties
+
+    var title: String?
+    var type: String?
+    var description: String?
+    var url: String?
+    var color: Int?
+    var footer: DiscordEmbedFooter?
+    var image: DiscordEmbedImage?
+}
+
+struct DiscordEmbedFooter: Codable, Hashable, Sendable {
+    // MARK: Stored Properties
+
+    var text: String
+    var icon_url: String?
+}
+
+struct DiscordEmbedImage: Codable, Hashable, Sendable {
+    // MARK: Stored Properties
+
+    var url: String
+    var height: Int?
+    var width: Int?
 }
 
 struct DiscordCreateDMRequest: Codable, Sendable {

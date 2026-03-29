@@ -160,12 +160,12 @@ actor FizzeBot {
         guard event.author.id != botUserID else { return }
 
         let engine = IconicResponseEngine(
-            triggers: configuration.iconic_triggers,
+            messagesByTrigger: configuration.iconic_messages,
             cooldownStore: cooldownStore,
             cooldown: configuration.trigger_cooldown_seconds
         )
         if let response = await engine.response(for: event.content) {
-            try await restClient.createMessage(channel_id: event.channel_id, content: response)
+            try await restClient.createMessage(channel_id: event.channel_id, payload: response.discordMessageCreate)
         }
     }
 }

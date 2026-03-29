@@ -23,7 +23,7 @@ struct BotConfigurationFile: Codable, Sendable {
     var warning_dm_template: String
     var trigger_cooldown_seconds: Double
     var leave_audit_log_lookback_seconds: Double
-    var iconic_triggers: [IconicTriggerConfiguration]
+    var iconic_messages: [String: IconicMessageConfiguration]
 
     // MARK: Defaults
 
@@ -48,7 +48,7 @@ struct BotConfigurationFile: Codable, Sendable {
         warning_dm_template: "You have been warned in {guild_name}: {reason}",
         trigger_cooldown_seconds: 30,
         leave_audit_log_lookback_seconds: 30,
-        iconic_triggers: []
+        iconic_messages: [:]
     )
 
     // MARK: Validation
@@ -106,7 +106,7 @@ struct BotConfigurationFile: Codable, Sendable {
             warning_dm_template: warning_dm_template,
             trigger_cooldown_seconds: trigger_cooldown_seconds,
             leave_audit_log_lookback_seconds: leave_audit_log_lookback_seconds,
-            iconic_triggers: iconic_triggers
+            iconic_messages: try Self.normalizedIconicMessages(iconic_messages)
         )
     }
 
@@ -160,6 +160,15 @@ struct BotConfigurationFile: Codable, Sendable {
         }
         return raw
     }
+
+    private static func normalizedIconicMessages(_ messages: [String: IconicMessageConfiguration]) throws -> [String: IconicMessageConfiguration] {
+        var normalized: [String: IconicMessageConfiguration] = [:]
+        for (trigger, message) in messages {
+            let normalizedTrigger = try IconicMessageConfiguration.normalizedTrigger(trigger)
+            normalized[normalizedTrigger] = try message.readyForRuntime(trigger: normalizedTrigger)
+        }
+        return normalized
+    }
 }
 
 struct AppConfiguration: Sendable {
@@ -190,7 +199,7 @@ struct AppConfiguration: Sendable {
     var warning_dm_template: String { file.warning_dm_template }
     var trigger_cooldown_seconds: Double { file.trigger_cooldown_seconds }
     var leave_audit_log_lookback_seconds: Double { file.leave_audit_log_lookback_seconds }
-    var iconic_triggers: [IconicTriggerConfiguration] { file.iconic_triggers }
+    var iconic_messages: [String: IconicMessageConfiguration] { file.iconic_messages }
 
     var say_success_message: String { "Sent." }
 
@@ -201,9 +210,48 @@ struct AppConfiguration: Sendable {
     }
 }
 
-struct IconicTriggerConfiguration: Codable, Hashable, Sendable {
+struct IconicMessageConfiguration: Codable, Hashable, Sendable {
     // MARK: Stored Properties
 
-    var trigger: String
-    var response: String
+    var content: String?
+    var embeds: [DiscordEmbed]?
+
+    // MARK: Public API
+
+    var discordMessageCreate: DiscordMessageCreate {
+        DiscordMessageCreate(content: content, embeds: embeds, flags: nil)
+    }
+
+    var payloadSummary: String {
+        switch (content != nil, embeds?.isEmpty == false) {
+        case (true, true):
+            return "text + embeds"
+        case (true, false):
+            return "text"
+        case (false, true):
+            return "embeds"
+        case (false, false):
+            return "empty"
+        }
+    }
+
+    func readyForRuntime(trigger: String) throws -> IconicMessageConfiguration {
+        let trimmedContent = content?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedContent = trimmedContent?.isEmpty == true ? nil : trimmedContent
+        let normalizedEmbeds = embeds?.isEmpty == true ? nil : embeds
+
+        guard normalizedContent != nil || normalizedEmbeds != nil else {
+            throw UserFacingError("IconicMessageConfiguration.readyForRuntime: iconic message `\(trigger)` must include text content, embeds, or both. The most likely cause is an empty iconic-message entry in `fizze-assistant.json`.")
+        }
+
+        return IconicMessageConfiguration(content: normalizedContent, embeds: normalizedEmbeds)
+    }
+
+    static func normalizedTrigger(_ trigger: String) throws -> String {
+        let normalized = trigger.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else {
+            throw UserFacingError("IconicMessageConfiguration.normalizedTrigger: iconic-message triggers cannot be blank. The most likely cause is an empty trigger key in `fizze-assistant.json` or `/config trigger-add`.")
+        }
+        return normalized
+    }
 }

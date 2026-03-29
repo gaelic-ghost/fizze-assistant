@@ -110,15 +110,11 @@ actor ConfigurationStore {
     }
 
     func addTrigger(trigger: String, response: String) throws -> BotConfigurationFile {
-        let normalizedTrigger = try normalizedRequiredString(trigger, name: "trigger")
+        let normalizedTrigger = try IconicMessageConfiguration.normalizedTrigger(trigger)
         let normalizedResponse = try normalizedRequiredString(response, name: "response")
 
         var next = configurationFile
-        if let index = next.iconic_triggers.firstIndex(where: { $0.trigger.caseInsensitiveCompare(normalizedTrigger) == .orderedSame }) {
-            next.iconic_triggers[index] = IconicTriggerConfiguration(trigger: normalizedTrigger, response: normalizedResponse)
-        } else {
-            next.iconic_triggers.append(IconicTriggerConfiguration(trigger: normalizedTrigger, response: normalizedResponse))
-        }
+        next.iconic_messages[normalizedTrigger] = IconicMessageConfiguration(content: normalizedResponse, embeds: nil)
 
         configurationFile = try next.readyForRuntime(botToken: botToken.isEmpty ? "placeholder-token" : botToken)
         try persist(configurationFile: configurationFile)
@@ -126,12 +122,11 @@ actor ConfigurationStore {
     }
 
     func removeTrigger(trigger: String) throws -> Bool {
-        let normalizedTrigger = try normalizedRequiredString(trigger, name: "trigger")
+        let normalizedTrigger = try IconicMessageConfiguration.normalizedTrigger(trigger)
         var next = configurationFile
-        let originalCount = next.iconic_triggers.count
-        next.iconic_triggers.removeAll { $0.trigger.caseInsensitiveCompare(normalizedTrigger) == .orderedSame }
+        let removed = next.iconic_messages.removeValue(forKey: normalizedTrigger) != nil
 
-        guard next.iconic_triggers.count != originalCount else {
+        guard removed else {
             return false
         }
 

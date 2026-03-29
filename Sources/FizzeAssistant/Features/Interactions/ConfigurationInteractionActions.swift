@@ -38,10 +38,15 @@ extension DiscordInteractionRouter {
         case "trigger-list":
             let runtime = await configurationStore.configurationFileContents()
             let content: String
-            if runtime.iconic_triggers.isEmpty {
+            if runtime.iconic_messages.isEmpty {
                 content = "No exact-match triggers are configured."
             } else {
-                content = runtime.iconic_triggers.map { "`\($0.trigger)` -> \($0.response)" }.joined(separator: "\n")
+                content = runtime.iconic_messages
+                    .sorted { $0.key < $1.key }
+                    .map { trigger, message in
+                        "`\(trigger)` -> \(message.payloadSummary)"
+                    }
+                    .joined(separator: "\n")
             }
             try await respond(to: interaction, content: content, ephemeral: true)
 

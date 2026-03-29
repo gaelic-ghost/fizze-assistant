@@ -111,6 +111,8 @@ Discord-side runtime config commands:
 - `/config trigger-remove trigger:<exact phrase>`
 - `/config trigger-list`
 
+Simple text iconic messages can be added from Discord with `/config trigger-add`. Richer iconic messages that include embeds are stored directly in `fizze-assistant.json` under `iconic_messages`, keyed by normalized trigger text.
+
 Only the dedicated config-owner roles may use `/config`. Normal staff roles can still use the moderation and `/say` commands, but they cannot change bot configuration.
 
 Discord members with the native `Administrator` or `Manage Server` permission are also allowed to use staff and config-owner commands, even if their role IDs are not listed explicitly in the local config.
