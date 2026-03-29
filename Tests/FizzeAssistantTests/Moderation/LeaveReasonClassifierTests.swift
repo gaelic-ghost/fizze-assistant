@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct LeaveReasonClassifierTests {
+    // MARK: Tests
+
     @Test
     func recentBanCacheReturnsBanned() async throws {
         let cache = ModerationEventCache()

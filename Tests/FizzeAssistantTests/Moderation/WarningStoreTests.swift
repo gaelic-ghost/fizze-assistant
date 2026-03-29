@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct WarningStoreTests {
+    // MARK: Tests
+
     @Test
     func createAndDeleteWarnings() async throws {
         let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())

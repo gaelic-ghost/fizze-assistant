@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct DiscordRESTClientTests {
+    // MARK: Tests
+
     @Test
     func rateLimitDelayPrefersRetryAfterHeader() {
         let client = DiscordRESTClient(token: "token", logger: .init(label: "test"))

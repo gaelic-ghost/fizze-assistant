@@ -1,7 +1,11 @@
 import Foundation
 
 actor TriggerCooldownStore {
+    // MARK: Stored Properties
+
     private var fireDates: [String: Date] = [:]
+
+    // MARK: Public API
 
     func canFire(trigger: String, cooldown: TimeInterval, now: Date = Date()) -> Bool {
         let key = trigger.lowercased()
@@ -15,9 +19,13 @@ actor TriggerCooldownStore {
 }
 
 struct IconicResponseEngine {
+    // MARK: Stored Properties
+
     let triggers: [IconicTriggerConfiguration]
     let cooldownStore: TriggerCooldownStore
     let cooldown: TimeInterval
+
+    // MARK: Public API
 
     func response(for content: String) async -> String? {
         let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct DiscordInteractionMemberTests {
+    // MARK: Tests
+
     @Test
     func interactionMemberDecodesPermissionsAndRoles() throws {
         let data = """

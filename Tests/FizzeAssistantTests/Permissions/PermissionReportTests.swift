@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct PermissionReportTests {
+    // MARK: Tests
+
     @Test
     func setupReportUsesFriendlyWarningLanguage() {
         let report = PermissionReport(issues: [

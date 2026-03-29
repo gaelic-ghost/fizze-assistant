@@ -29,7 +29,7 @@ actor FizzeBot {
         self.guildName = guild.name
     }
 
-    // MARK: Run Loop
+    // MARK: Public API
 
     func run() async throws {
         let configuration = await configurationStore.currentConfiguration()
@@ -74,7 +74,7 @@ actor FizzeBot {
                 await banCache.recordBan(for: ban.user.id)
 
             case let .interaction(interaction):
-                let handler = InteractionHandler(
+                let handler = DiscordInteractionRouter(
                     restClient: restClient,
                     configurationStore: configurationStore,
                     warningStore: warningStore,
@@ -150,6 +150,8 @@ actor FizzeBot {
         }
         try await restClient.createMessage(channel_id: leave_channel_id, content: announcement)
     }
+
+    // MARK: Messaging Helpers
 
     private func handleMessageCreate(_ event: DiscordMessageEvent) async throws {
         let configuration = await configurationStore.currentConfiguration()

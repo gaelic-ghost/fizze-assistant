@@ -1,10 +1,14 @@
 import Foundation
 import Logging
 
-struct CommandRegistrar {
+struct DiscordCommandRegistrar {
+    // MARK: Stored Properties
+
     let restClient: DiscordRESTClient
     let configuration: AppConfiguration
     let logger: Logger
+
+    // MARK: Public API
 
     func registerGuildCommands() async throws {
         let commands = [

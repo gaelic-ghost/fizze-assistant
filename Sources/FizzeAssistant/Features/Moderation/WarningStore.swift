@@ -2,12 +2,16 @@ import Foundation
 import GRDB
 
 struct WarningRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+    // MARK: Stored Properties
+
     var id: String
     var guild_id: String
     var user_id: String
     var moderator_user_id: String
     var reason: String
     var created_at: Date
+
+    // MARK: Columns
 
     enum Columns {
         static let id = Column(CodingKeys.id)
@@ -18,7 +22,11 @@ struct WarningRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
 }
 
 actor WarningStore {
+    // MARK: Stored Properties
+
     private let dbQueue: DatabaseQueue
+
+    // MARK: Lifecycle
 
     init(path: String) throws {
         let directoryURL = URL(fileURLWithPath: path).deletingLastPathComponent()
@@ -26,6 +34,8 @@ actor WarningStore {
         self.dbQueue = try DatabaseQueue(path: path)
         try Self.makeMigrator().migrate(dbQueue)
     }
+
+    // MARK: Public API
 
     func createWarning(guild_id: String, user_id: String, moderator_user_id: String, reason: String) throws -> WarningRecord {
         let warning = WarningRecord(
@@ -66,6 +76,8 @@ actor WarningStore {
                 .deleteAll(db)
         }
     }
+
+    // MARK: Private Helpers
 
     private static func makeMigrator() -> DatabaseMigrator {
         var migrator = DatabaseMigrator()

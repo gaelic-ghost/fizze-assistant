@@ -2,6 +2,8 @@ import Foundation
 import Logging
 
 enum AppCommand {
+    // MARK: Cases
+
     case run
     case registerCommands
     case check
@@ -54,7 +56,7 @@ enum BotApplication {
 
             switch command {
         case .registerCommands:
-            let registrar = CommandRegistrar(restClient: restClient, configuration: configuration, logger: configuredLogger)
+            let registrar = DiscordCommandRegistrar(restClient: restClient, configuration: configuration, logger: configuredLogger)
             try await registrar.registerGuildCommands()
             configuredLogger.info("Registered guild commands.", metadata: ["guild_id": .string(configuration.guild_id)])
 

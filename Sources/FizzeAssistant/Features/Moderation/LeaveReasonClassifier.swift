@@ -1,7 +1,11 @@
 import Foundation
 
 actor ModerationEventCache {
+    // MARK: Stored Properties
+
     private var banEvents: [String: Date] = [:]
+
+    // MARK: Public API
 
     func recordBan(for user_id: String, at date: Date = Date()) {
         banEvents[user_id] = date
@@ -17,6 +21,8 @@ actor ModerationEventCache {
 }
 
 enum LeaveReason: String, Sendable {
+    // MARK: Cases
+
     case voluntary
     case kicked
     case banned
@@ -24,9 +30,13 @@ enum LeaveReason: String, Sendable {
 }
 
 struct LeaveReasonClassifier {
+    // MARK: Stored Properties
+
     let restClient: DiscordRESTClient
     let configuration: AppConfiguration
     let banCache: ModerationEventCache
+
+    // MARK: Public API
 
     func classify(user_id: String, now: Date = Date()) async throws -> LeaveReason {
         if await banCache.recentBan(for: user_id, within: configuration.leave_audit_log_lookback_seconds, now: now) {

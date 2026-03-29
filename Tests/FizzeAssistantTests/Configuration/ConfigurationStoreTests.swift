@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct ConfigurationStoreTests {
+    // MARK: Tests
+
     @Test
     func runtimeUpdatesPersistToDisk() async throws {
         let rootURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString, isDirectory: true)

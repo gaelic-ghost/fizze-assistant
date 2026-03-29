@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct DiscordGatewayPayloadTests {
+    // MARK: Tests
+
     @Test
     func helloPayloadDecodesHeartbeatIntervalFromGatewayEnvelope() throws {
         let data = """

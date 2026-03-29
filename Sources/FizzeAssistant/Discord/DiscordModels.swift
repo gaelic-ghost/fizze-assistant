@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - Core Discord Types
+
 typealias DiscordSnowflake = String
 
 struct DiscordUser: Codable, Sendable {
@@ -11,6 +13,8 @@ struct DiscordUser: Codable, Sendable {
         global_name ?? username
     }
 }
+
+// MARK: - Guild and Channel Models
 
 struct DiscordRole: Codable, Sendable {
     var id: DiscordSnowflake
@@ -59,6 +63,8 @@ struct DiscordAuditLogEntry: Codable, Sendable {
     var user_id: DiscordSnowflake?
 }
 
+// MARK: - Slash Command Models
+
 struct DiscordSlashCommand: Codable, Sendable {
     var name: String
     var description: String
@@ -74,6 +80,8 @@ struct DiscordApplicationCommandOption: Codable, Sendable {
     var channel_types: [Int]?
     var options: [DiscordApplicationCommandOption]? = nil
 }
+
+// MARK: - Interaction Models
 
 struct DiscordInteraction: Codable, Sendable {
     var id: DiscordSnowflake
@@ -116,6 +124,8 @@ struct DiscordCreateDMRequest: Codable, Sendable {
     var recipient_id: DiscordSnowflake
 }
 
+// MARK: - Gateway Event Models
+
 struct DiscordGatewayEnvelope: Codable, Sendable {
     var op: Int
     var d: JSONValue?
@@ -152,6 +162,8 @@ struct DiscordMessageEvent: Codable, Sendable {
     var author: DiscordUser
     var webhook_id: DiscordSnowflake?
 }
+
+// MARK: - JSON Support
 
 enum JSONValue: Codable, Sendable {
     case string(String)

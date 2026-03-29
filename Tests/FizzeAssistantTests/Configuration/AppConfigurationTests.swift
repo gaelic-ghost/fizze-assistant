@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct AppConfigurationTests {
+    // MARK: Tests
+
     @Test
     func configurationStoreParsesSingleConfigFile() async throws {
         let rootURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString, isDirectory: true)

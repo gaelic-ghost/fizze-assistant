@@ -3,6 +3,8 @@ import Testing
 @testable import FizzeAssistant
 
 struct IconicResponseEngineTests {
+    // MARK: Tests
+
     @Test
     func exactMatchIsCaseInsensitive() async {
         let engine = IconicResponseEngine(
