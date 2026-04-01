@@ -63,6 +63,10 @@ struct DiscordRESTClient {
         _ = try await emptyRequest(path: "/guilds/\(guild_id)/members/\(user_id)/roles/\(role_id)", method: "PUT")
     }
 
+    func removeRole(from user_id: DiscordSnowflake, guild_id: DiscordSnowflake, role_id: DiscordSnowflake) async throws {
+        _ = try await emptyRequest(path: "/guilds/\(guild_id)/members/\(user_id)/roles/\(role_id)", method: "DELETE")
+    }
+
     func createMessage(channel_id: DiscordSnowflake, payload: DiscordMessageCreate) async throws {
         _ = try await emptyRequest(path: "/channels/\(channel_id)/messages", method: "POST", body: payload)
     }

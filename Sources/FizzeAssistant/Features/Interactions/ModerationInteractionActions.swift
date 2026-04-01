@@ -9,6 +9,8 @@ extension DiscordInteractionRouter {
         switch data.name ?? "" {
         case "arrest":
             try await handleArrestCommand(interaction, data: data, configuration: configuration)
+        case "bailout":
+            try await handleBailoutCommand(interaction, data: data, configuration: configuration)
         case "warn":
             try await handleWarnCommand(interaction, data: data, configuration: configuration, guildName: guildName)
         case "warns":
@@ -32,6 +34,16 @@ extension DiscordInteractionRouter {
             role_id: Self.arrestRoleID
         )
         try await respond(to: interaction, content: "Applied the arrest role to <@\(userID)>.", ephemeral: true)
+    }
+
+    private func handleBailoutCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration) async throws {
+        let userID = try requireOption(named: "user", from: data, commandName: "bailout").stringValueRequired(commandName: "bailout", optionName: "user")
+        try await restClient.removeRole(
+            from: userID,
+            guild_id: configuration.guild_id,
+            role_id: Self.arrestRoleID
+        )
+        try await respond(to: interaction, content: "Removed the arrest role from <@\(userID)>.", ephemeral: true)
     }
 
     private func handleWarnCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration, guildName: String) async throws {

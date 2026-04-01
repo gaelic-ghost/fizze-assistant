@@ -208,6 +208,43 @@ struct DiscordInteractionRouterTests {
     }
 
     @Test
+    func bailoutCommandRemovesConfiguredRoleAndAcknowledgesModerator() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+        let router = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        await router.handle(
+            slashInteraction(
+                id: "interaction-bailout",
+                name: "bailout",
+                memberRoles: ["staff-role"],
+                options: [
+                    DiscordInteractionOption(name: "user", type: 6, value: .string("user-9"), options: nil),
+                ]
+            ),
+            guildName: "Guild"
+        )
+
+        let requests = stub.requests()
+        #expect(requests.count == 2)
+
+        let roleRequest = try #require(requests.first)
+        #expect(roleRequest.httpMethod == "DELETE")
+        #expect(roleRequest.url?.path == "/api/v10/guilds/guild/members/user-9/roles/819657472209977404")
+
+        let callbackRequest = try #require(requests.last)
+        #expect(callbackRequest.url?.path == "/api/v10/interactions/interaction-bailout/token-interaction-bailout/callback")
+        let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
+        #expect(callbackPayload.data?.content == "Removed the arrest role from <@user-9>.")
+        #expect(callbackPayload.data?.flags == 64)
+    }
+
+    @Test
     func sayCommandPostsToRequestedChannelAndAcknowledgesSender() async throws {
         let rootURL = try makeTemporaryTestDirectory()
         let stub = makeDiscordRESTClient { request in

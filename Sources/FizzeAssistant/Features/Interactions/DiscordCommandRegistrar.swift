@@ -36,6 +36,13 @@ struct DiscordCommandRegistrar {
                 ]
             ),
             DiscordSlashCommand(
+                name: "bailout",
+                description: "Remove the arrest role from a user.",
+                options: [
+                    DiscordApplicationCommandOption(type: 6, name: "user", description: "User to release.", required: true, channel_types: nil),
+                ]
+            ),
+            DiscordSlashCommand(
                 name: "warns",
                 description: "Show warning history for a user.",
                 options: [
