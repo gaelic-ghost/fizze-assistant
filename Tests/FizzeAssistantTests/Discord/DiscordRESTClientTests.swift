@@ -88,4 +88,57 @@ struct DiscordRESTClientTests {
         let delay = client.rateLimitDelay(response: response, body: body)
         #expect(delay == 3.75)
     }
+
+    @Test
+    func addRoleRetriesAfterTransientNetworkLoss() async throws {
+        let lock = NSLock()
+        var attempts = 0
+        let stub = makeDiscordRESTClient { request in
+            lock.lock()
+            attempts += 1
+            let currentAttempt = attempts
+            lock.unlock()
+
+            #expect(request.url?.path == "/api/v10/guilds/guild-1/members/user-1/roles/role-1")
+            #expect(request.httpMethod == "PUT")
+
+            if currentAttempt == 1 {
+                throw URLError(.networkConnectionLost)
+            }
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 204, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+
+        try await stub.client.addRole(to: "user-1", guild_id: "guild-1", role_id: "role-1")
+
+        #expect(stub.requests().count == 2)
+    }
+
+    @Test
+    func createMessageDoesNotRetryAfterTransientNetworkLoss() async throws {
+        let lock = NSLock()
+        var attempts = 0
+        let stub = makeDiscordRESTClient { request in
+            lock.lock()
+            attempts += 1
+            lock.unlock()
+
+            #expect(request.url?.path == "/api/v10/channels/channel-1/messages")
+            #expect(request.httpMethod == "POST")
+            throw URLError(.networkConnectionLost)
+        }
+
+        do {
+            try await stub.client.createMessage(channel_id: "channel-1", content: "sparkle")
+            Issue.record("Expected createMessage to fail after the transport drop.")
+        } catch let error as URLError {
+            #expect(error.code == .networkConnectionLost)
+        }
+
+        #expect(attempts == 1)
+        #expect(stub.requests().count == 1)
+    }
 }

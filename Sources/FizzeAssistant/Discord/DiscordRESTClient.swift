@@ -187,7 +187,26 @@ struct DiscordRESTClient {
     }
 
     private func performRawRequest(_ request: URLRequest, path: String, attempt: Int) async throws -> Data {
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as CancellationError {
+            throw error
+        } catch {
+            if shouldRetryTransportError(error, request: request, attempt: attempt) {
+                let delay = transportRetryDelaySeconds(forAttempt: attempt)
+                logger.warning("DiscordRESTClient.performRawRequest: the network dropped during a Discord API call, so the bot will retry this idempotent route with backoff.", metadata: [
+                    "path": .string(path),
+                    "retry_after_seconds": .string(String(delay)),
+                    "attempt": .string(String(attempt + 1)),
+                    "error": .string(String(describing: error)),
+                ])
+                try await Task.sleep(for: .seconds(delay))
+                return try await performRawRequest(request, path: path, attempt: attempt + 1)
+            }
+            throw error
+        }
         guard let http = response as? HTTPURLResponse else {
             throw RESTError.invalidResponse
         }
@@ -220,6 +239,42 @@ struct DiscordRESTClient {
         }
 
         throw RESTError.discordError(statusCode: http.statusCode, body: String(data: data, encoding: .utf8) ?? "<unreadable>")
+    }
+
+    private func shouldRetryTransportError(_ error: Error, request: URLRequest, attempt: Int) -> Bool {
+        guard attempt < maxRetryAttempts else { return false }
+        guard isIdempotentForRetry(request: request) else { return false }
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .notConnectedToInternet:
+                return true
+            default:
+                return false
+            }
+        }
+
+        let nsError = error as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+        switch nsError.code {
+        case NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut, NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost, NSURLErrorDNSLookupFailed, NSURLErrorNotConnectedToInternet:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func isIdempotentForRetry(request: URLRequest) -> Bool {
+        switch request.httpMethod?.uppercased() {
+        case "GET", "PUT", "DELETE":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func transportRetryDelaySeconds(forAttempt attempt: Int) -> Double {
+        min(pow(2.0, Double(attempt)), 5.0)
     }
 
     func rateLimitDelay(response: HTTPURLResponse, body: Data) -> Double {
