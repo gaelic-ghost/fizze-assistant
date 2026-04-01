@@ -9,6 +9,8 @@ enum ThisIsIconicWizard {
     static let contentModalPrefix = "this-is-iconic:content-modal:"
     static let contentFieldID = "this-is-iconic:content"
     static let continuePrompt = "how can i be this iconic? what should i do? how should i look?"
+    static let contentFieldLabel = "What should I say or do?"
+    static let contentFieldPlaceholder = "Tell me what to say, and include an image URL if you want one."
     static let successMessage = "thank you so much! i'll start practicing this right away!"
 }
 
@@ -40,8 +42,8 @@ extension DiscordInteractionRouter {
             components: [
                 paragraphInputRow(
                     customID: ThisIsIconicWizard.contentFieldID,
-                    label: ThisIsIconicWizard.continuePrompt,
-                    placeholder: "Tell me what to say, and include an image URL if you want one.",
+                    label: ThisIsIconicWizard.contentFieldLabel,
+                    placeholder: ThisIsIconicWizard.contentFieldPlaceholder,
                     maxLength: 4_000
                 ),
             ]

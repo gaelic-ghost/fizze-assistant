@@ -60,6 +60,11 @@ struct DiscordInteractionRouterTests {
         )
         let contentModalID = contentModalPayload.data?.custom_id
         #expect(contentModalPayload.type == DiscordInteractionCallbackType.modal)
+        let contentField = try #require(contentModalPayload.data?.components?.first?.components?.first)
+        #expect(contentField.custom_id == ThisIsIconicWizard.contentFieldID)
+        #expect(contentField.label == ThisIsIconicWizard.contentFieldLabel)
+        #expect((contentField.label?.count ?? 0) <= 45)
+        #expect(contentField.placeholder == ThisIsIconicWizard.contentFieldPlaceholder)
 
         await router.handle(
             modalInteraction(

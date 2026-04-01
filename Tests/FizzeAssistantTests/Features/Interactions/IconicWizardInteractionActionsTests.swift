@@ -21,6 +21,12 @@ struct IconicWizardInteractionActionsTests {
         #expect(message.embeds?.first?.image?.url == "https://example.com/first.png")
     }
 
+    @Test
+    func secondStepModalLabelFitsDiscordLimit() {
+        #expect(ThisIsIconicWizard.contentFieldLabel.count <= 45)
+        #expect(!ThisIsIconicWizard.contentFieldLabel.isEmpty)
+    }
+
     // MARK: Helpers
 
     private func makeRouter() async throws -> DiscordInteractionRouter {
