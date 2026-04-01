@@ -106,8 +106,18 @@ actor DiscordGatewayClient {
             }
             reconnectAttempt += 1
             try await connect(using: targetURL)
+        } catch is CancellationError {
+            logger.debug("DiscordGatewayClient.reconnect: this reconnect attempt was cancelled before the new socket opened, so the bot will wait for the next recovery trigger.")
         } catch {
             logger.warning("DiscordGatewayClient.reconnect: this reconnect attempt did not complete, but the bot will keep trying while it stays running.", metadata: ["error": .string(String(describing: error))])
+        }
+    }
+
+    private func scheduleReconnect() {
+        guard isRunning else { return }
+
+        Task { [weak self] in
+            await self?.reconnect()
         }
     }
 
@@ -130,7 +140,7 @@ actor DiscordGatewayClient {
                 return
             } catch {
                 logger.warning("DiscordGatewayClient.receiveLoop: the live Gateway connection dropped, so the bot is opening a fresh connection.", metadata: ["error": .string(String(describing: error))])
-                await reconnect()
+                scheduleReconnect()
                 return
             }
         }
@@ -157,12 +167,12 @@ actor DiscordGatewayClient {
             try await handleDispatch(eventName: envelope.t, payload: envelope.d)
 
         case DiscordGatewayOpCode.reconnect:
-            await reconnect()
+            scheduleReconnect()
 
         case DiscordGatewayOpCode.invalidSession:
             session_id = nil
             resumeURL = nil
-            await reconnect()
+            scheduleReconnect()
 
         case DiscordGatewayOpCode.heartbeatAck:
             awaitingHeartbeatACK = false
@@ -178,7 +188,7 @@ actor DiscordGatewayClient {
             do {
                 if awaitingHeartbeatACK {
                     logger.warning("DiscordGatewayClient.heartbeatLoop: Discord stopped acknowledging heartbeats in time, so the bot is refreshing the Gateway connection.")
-                    await reconnect()
+                    scheduleReconnect()
                     return
                 }
 
@@ -193,7 +203,7 @@ actor DiscordGatewayClient {
                 return
             } catch {
                 logger.warning("DiscordGatewayClient.heartbeatLoop: the heartbeat send cycle did not complete cleanly, so the bot is reopening the Gateway connection.", metadata: ["error": .string(String(describing: error))])
-                await reconnect()
+                scheduleReconnect()
                 return
             }
         }

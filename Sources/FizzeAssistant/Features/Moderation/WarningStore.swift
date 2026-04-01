@@ -25,14 +25,18 @@ actor WarningStore {
     // MARK: Stored Properties
 
     private let dbQueue: DatabaseQueue
+    private let configuredGuildID: String?
 
     // MARK: Lifecycle
 
-    init(path: String) throws {
+    init(path: String, configuredGuildID: String? = nil) throws {
         let directoryURL = URL(fileURLWithPath: path).deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        self.configuredGuildID = configuredGuildID?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
         self.dbQueue = try DatabaseQueue(path: path)
-        try Self.makeMigrator().migrate(dbQueue)
+        try Self.makeMigrator(configuredGuildID: self.configuredGuildID).migrate(dbQueue)
     }
 
     // MARK: Public API
@@ -79,7 +83,7 @@ actor WarningStore {
 
     // MARK: Private Helpers
 
-    private static func makeMigrator() -> DatabaseMigrator {
+    private static func makeMigrator(configuredGuildID: String?) -> DatabaseMigrator {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createWarnings") { db in
             try db.create(table: "warningRecord") { table in
@@ -91,6 +95,21 @@ actor WarningStore {
                 table.column("created_at", .datetime).notNull()
             }
         }
+        migrator.registerMigration("addGuildIDToWarnings") { db in
+            let columnNames = try db.columns(in: "warningRecord").map(\.name)
+            guard !columnNames.contains("guild_id") else { return }
+
+            let guildID = configuredGuildID ?? ""
+            try db.alter(table: "warningRecord") { table in
+                table.add(column: "guild_id", .text).notNull().defaults(to: guildID)
+            }
+        }
         return migrator
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

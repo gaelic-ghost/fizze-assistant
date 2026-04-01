@@ -66,7 +66,10 @@ actor FizzeBot {
         self.restClient = restClient
         self.logger = logger
         let configuration = await configurationStore.currentConfiguration()
-        self.warningStore = try WarningStore(path: configuration.database_path)
+        self.warningStore = try WarningStore(
+            path: configuration.database_path,
+            configuredGuildID: configuration.guild_id
+        )
         self.interactionRouter = DiscordInteractionRouter(
             restClient: restClient,
             configurationStore: configurationStore,
