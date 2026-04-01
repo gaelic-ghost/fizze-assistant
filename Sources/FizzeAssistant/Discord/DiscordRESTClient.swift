@@ -207,7 +207,13 @@ struct DiscordRESTClient {
         requiresBotAuthorization: Bool = true
     ) async throws -> T {
         let data = try encoder.encode(body)
-        return try await request(path: path, method: method, body: data, requiresBotAuthorization: requiresBotAuthorization)
+        return try await request(
+            path: path,
+            method: method,
+            queryItems: [],
+            body: data,
+            requiresBotAuthorization: requiresBotAuthorization
+        )
     }
 
     private func request<T: Decodable>(
