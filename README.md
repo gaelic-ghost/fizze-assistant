@@ -181,3 +181,11 @@ That keeps the process easy to start over SSH without committing to a larger dep
 - Runtime config changes are limited to a narrow allowlist of non-secret values, even though the broader non-secret baseline now lives in the committed `fizze-assistant.json` file. With the local override flow, those live changes land in `fizze-assistant-local.json` by default.
 - Command authorization is enforced by the bot itself; this project does not currently configure Discord’s separate per-command permission system.
 - This repo is intentionally a one-off bot project for a specific friends’ server, not a reusable multi-server bot framework.
+
+## Planned Directions
+
+- Moderation quality-of-life improvements such as richer warning history views, warning expiration, and better leave/ban/kick attribution.
+- Config UX improvements such as safer previews, richer validation, and more helpful config-owner command flows.
+- Messaging polish such as per-channel trigger controls, better mention-reply rules, and richer iconic response authoring.
+- Operator visibility improvements such as setup diagnostics, health/status commands, and clearer mod-log summaries.
+- Reliability refinements such as startup self-checks and safer Discord API recovery behavior.
