@@ -7,6 +7,7 @@
     "838539683541418025"
   ],
   "allowed_config_role_ids": [
+    "1488964588195287182",
     "1457929935355248661"
   ],
   "database_path": ".data/fizze-assistant.sqlite",
