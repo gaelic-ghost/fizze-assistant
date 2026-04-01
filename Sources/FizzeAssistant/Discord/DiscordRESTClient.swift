@@ -14,6 +14,7 @@ struct DiscordRESTClient {
     private let invalidRequestTracker: DiscordInvalidRequestTracker
     private let maxRetryAttempts = 5
     private let requestTimeoutSeconds: TimeInterval = 15
+    private let userAgent = "DiscordBot (https://github.com/gaelic-ghost/fizze-assistant, 1.0)"
 
     // MARK: Lifecycle
 
@@ -198,6 +199,7 @@ struct DiscordRESTClient {
         request.httpBody = body
         request.timeoutInterval = requestTimeoutSeconds
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
 
         if requiresBotAuthorization {
             request.setValue("Bot \(token)", forHTTPHeaderField: "Authorization")
@@ -398,21 +400,56 @@ private struct RequestDescriptor: Sendable {
 
     private static func canonicalRoutePath(_ path: String) -> String {
         var segments = path.split(separator: "/").map(String.init)
-        if segments.count > 1 {
-            switch segments[0] {
-            case "channels":
-                segments[1] = "{channel_id}"
-            case "guilds":
-                segments[1] = "{guild_id}"
-            case "webhooks":
-                segments[1] = "{webhook_id}"
-                if segments.count > 2 {
-                    segments[2] = "{webhook_token}"
-                }
-            default:
-                break
-            }
+        guard segments.count > 1 else {
+            return "/" + segments.joined(separator: "/")
         }
+
+        switch segments[0] {
+        case "applications":
+            segments[1] = "{application_id}"
+            if segments.count > 3, segments[2] == "guilds" {
+                segments[3] = "{guild_id}"
+            }
+            if segments.count > 5, segments[4] == "commands" {
+                segments[5] = "{command_id}"
+            }
+        case "channels":
+            segments[1] = "{channel_id}"
+            if segments.count > 3, segments[2] == "messages" {
+                segments[3] = "{message_id}"
+            }
+        case "guilds":
+            segments[1] = "{guild_id}"
+            if segments.count > 3, segments[2] == "members" {
+                segments[3] = "{user_id}"
+                if segments.count > 5, segments[4] == "roles" {
+                    segments[5] = "{role_id}"
+                }
+            }
+            if segments.count > 3, segments[2] == "roles" {
+                segments[3] = "{role_id}"
+            }
+            if segments.count > 5, segments[2] == "commands", segments[4] == "permissions" {
+                segments[3] = "{command_id}"
+                segments[5] = "{permissions_id}"
+            }
+        case "interactions":
+            segments[1] = "{interaction_id}"
+            if segments.count > 2 {
+                segments[2] = "{interaction_token}"
+            }
+        case "webhooks":
+            segments[1] = "{webhook_id}"
+            if segments.count > 2 {
+                segments[2] = "{webhook_token}"
+            }
+            if segments.count > 4, segments[3] == "messages", segments[4] != "@original" {
+                segments[4] = "{message_id}"
+            }
+        default:
+            break
+        }
+
         return "/" + segments.joined(separator: "/")
     }
 }

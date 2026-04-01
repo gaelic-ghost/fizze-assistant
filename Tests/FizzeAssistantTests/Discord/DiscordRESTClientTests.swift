@@ -12,6 +12,7 @@ struct DiscordRESTClientTests {
             #expect(request.url?.path == "/api/v10/channels/channel-1/messages")
             #expect(request.httpMethod == "POST")
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bot token")
+            #expect(request.value(forHTTPHeaderField: "User-Agent") == "DiscordBot (https://github.com/gaelic-ghost/fizze-assistant, 1.0)")
 
             let payload = try decodeRequestBody(DiscordMessageCreate.self, from: request)
             #expect(payload.content == "sparkle")
@@ -105,6 +106,48 @@ struct DiscordRESTClientTests {
             token: "token-1",
             payload: DiscordMessageCreate(content: "followup", embeds: nil, components: nil, flags: 64)
         )
+    }
+
+    @Test
+    func memberRoleBucketLearningCarriesAcrossDifferentUsersInTheSameGuild() async throws {
+        let lock = NSLock()
+        var requestsByPath: [String: Int] = [:]
+        let stub = makeDiscordRESTClient { request in
+            let path = try #require(request.url?.path)
+
+            lock.lock()
+            requestsByPath[path, default: 0] += 1
+            let attempt = requestsByPath[path, default: 0]
+            lock.unlock()
+
+            let headers: [String: String]
+            if path == "/api/v10/guilds/guild-1/members/user-1/roles/role-1", attempt == 1 {
+                headers = [
+                    "X-RateLimit-Bucket": "member-role-bucket",
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset-After": "0.05",
+                ]
+            } else {
+                headers = [
+                    "X-RateLimit-Bucket": "member-role-bucket",
+                    "X-RateLimit-Remaining": "1",
+                ]
+            }
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 204, httpVersion: nil, headerFields: headers)!,
+                Data()
+            )
+        }
+
+        try await stub.client.addRole(to: "user-1", guild_id: "guild-1", role_id: "role-1")
+
+        let start = ContinuousClock.now
+        try await stub.client.addRole(to: "user-2", guild_id: "guild-1", role_id: "role-1")
+        let elapsed = start.duration(to: .now)
+
+        #expect(elapsed >= .milliseconds(40))
+        #expect(stub.requests().count == 2)
     }
 
     @Test

@@ -171,6 +171,7 @@ struct DiscordInteractionRouterTests {
         #expect(deferredPayload.data?.flags == 64)
 
         let moderatorPayload = try decodeRequestBody(DiscordMessageCreate.self, from: requests[2])
+        #expect(moderatorPayload.flags == nil)
 
         let channelFollowup = try decodeRequestBody(DiscordMessageCreate.self, from: requests[3])
         #expect(channelFollowup.content == "<@user-1> warned <@user-2>.")
@@ -223,6 +224,7 @@ struct DiscordInteractionRouterTests {
         #expect(callbackRequest.url?.path == "/api/v10/webhooks/app/token-interaction-arrest/messages/@original")
         let callbackPayload = try decodeRequestBody(DiscordMessageCreate.self, from: callbackRequest)
         #expect(callbackPayload.content == "Applied the arrest role to <@user-9>.")
+        #expect(callbackPayload.flags == nil)
 
         let followupRequest = requests[3]
         #expect(followupRequest.url?.path == "/api/v10/channels/source-channel/messages")
@@ -271,6 +273,7 @@ struct DiscordInteractionRouterTests {
         #expect(callbackRequest.url?.path == "/api/v10/webhooks/app/token-interaction-bailout/messages/@original")
         let callbackPayload = try decodeRequestBody(DiscordMessageCreate.self, from: callbackRequest)
         #expect(callbackPayload.content == "Removed the arrest role from <@user-9>.")
+        #expect(callbackPayload.flags == nil)
 
         let followupRequest = requests[3]
         #expect(followupRequest.url?.path == "/api/v10/channels/source-channel/messages")

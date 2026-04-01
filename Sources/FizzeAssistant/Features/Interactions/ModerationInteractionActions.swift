@@ -177,14 +177,15 @@ extension DiscordInteractionRouter {
     }
 
     private func completeDeferredModerationResponse(for interaction: DiscordInteraction, content: String) async throws {
-        let payload = DiscordMessageCreate(content: content, embeds: nil, components: nil, flags: 64)
+        let editPayload = DiscordMessageCreate(content: content, embeds: nil, components: nil, flags: nil)
         do {
-            try await editOriginalResponse(to: interaction, payload: payload)
+            try await editOriginalResponse(to: interaction, payload: editPayload)
         } catch {
             logger.warning("DiscordInteractionRouter.completeDeferredModerationResponse: editing the deferred interaction response failed, so the bot is falling back to an ephemeral followup message.", metadata: [
                 "error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error)),
             ])
-            try await createInteractionFollowup(to: interaction, payload: payload)
+            let followupPayload = DiscordMessageCreate(content: content, embeds: nil, components: nil, flags: 64)
+            try await createInteractionFollowup(to: interaction, payload: followupPayload)
         }
     }
 
