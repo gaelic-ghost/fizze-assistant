@@ -61,6 +61,53 @@ struct DiscordRESTClientTests {
     }
 
     @Test
+    func editOriginalInteractionResponseUsesWebhookPatchWithoutBotAuthorization() async throws {
+        let stub = makeDiscordRESTClient { request in
+            #expect(request.url?.path == "/api/v10/webhooks/app-1/token-1/messages/@original")
+            #expect(request.httpMethod == "PATCH")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+
+            let payload = try decodeRequestBody(DiscordMessageCreate.self, from: request)
+            #expect(payload.content == "done")
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+
+        try await stub.client.editOriginalInteractionResponse(
+            application_id: "app-1",
+            token: "token-1",
+            payload: DiscordMessageCreate(content: "done", embeds: nil, components: nil, flags: nil)
+        )
+    }
+
+    @Test
+    func createInteractionFollowupUsesWebhookPostWithoutBotAuthorization() async throws {
+        let stub = makeDiscordRESTClient { request in
+            #expect(request.url?.path == "/api/v10/webhooks/app-1/token-1")
+            #expect(request.httpMethod == "POST")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+
+            let payload = try decodeRequestBody(DiscordMessageCreate.self, from: request)
+            #expect(payload.content == "followup")
+            #expect(payload.flags == 64)
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+
+        try await stub.client.createInteractionFollowup(
+            application_id: "app-1",
+            token: "token-1",
+            payload: DiscordMessageCreate(content: "followup", embeds: nil, components: nil, flags: 64)
+        )
+    }
+
+    @Test
     func rateLimitDelayPrefersRetryAfterHeader() {
         let client = DiscordRESTClient(token: "token", logger: .init(label: "test"))
         let response = HTTPURLResponse(
@@ -136,6 +183,38 @@ struct DiscordRESTClientTests {
             Issue.record("Expected createMessage to fail after the transport drop.")
         } catch let error as URLError {
             #expect(error.code == .networkConnectionLost)
+        }
+
+        #expect(attempts == 1)
+        #expect(stub.requests().count == 1)
+    }
+
+    @Test
+    func createMessageDoesNotRetryAfterServerError() async throws {
+        let lock = NSLock()
+        var attempts = 0
+        let stub = makeDiscordRESTClient { request in
+            lock.lock()
+            attempts += 1
+            lock.unlock()
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 502, httpVersion: nil, headerFields: [:])!,
+                Data("bad gateway".utf8)
+            )
+        }
+
+        do {
+            try await stub.client.createMessage(channel_id: "channel-1", content: "sparkle")
+            Issue.record("Expected createMessage to fail after the Discord server error.")
+        } catch let error as RESTError {
+            switch error {
+            case let .discordError(statusCode, body):
+                #expect(statusCode == 502)
+                #expect(body == "bad gateway")
+            default:
+                Issue.record("Expected a Discord HTTP error for the 502 response.")
+            }
         }
 
         #expect(attempts == 1)

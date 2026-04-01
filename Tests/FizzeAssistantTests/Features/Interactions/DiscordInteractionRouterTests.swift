@@ -160,18 +160,26 @@ struct DiscordInteractionRouterTests {
         )
 
         let requests = stub.requests()
-        #expect(requests.count == 3)
-        #expect(requests.first?.url?.path == "/api/v10/channels/mod-log-channel/messages")
-        #expect(requests[1].url?.path == "/api/v10/channels/source-channel/messages")
-        #expect(requests.last?.url?.path == "/api/v10/interactions/interaction-warn/token-interaction-warn/callback")
+        #expect(requests.count == 4)
+        #expect(requests[0].url?.path == "/api/v10/interactions/interaction-warn/token-interaction-warn/callback")
+        #expect(requests[1].url?.path == "/api/v10/channels/mod-log-channel/messages")
+        #expect(requests[2].url?.path == "/api/v10/webhooks/app/token-interaction-warn/messages/@original")
+        #expect(requests[3].url?.path == "/api/v10/channels/source-channel/messages")
 
-        let channelFollowup = try decodeRequestBody(DiscordMessageCreate.self, from: requests[1])
+        let deferredPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: requests[0])
+        #expect(deferredPayload.type == DiscordInteractionCallbackType.deferredChannelMessageWithSource)
+        #expect(deferredPayload.data?.flags == 64)
+
+        let moderatorPayload = try decodeRequestBody(DiscordMessageCreate.self, from: requests[2])
+
+        let channelFollowup = try decodeRequestBody(DiscordMessageCreate.self, from: requests[3])
         #expect(channelFollowup.content == "<@user-1> warned <@user-2>.")
 
         let warningStore = try WarningStore(path: rootURL.appendingPathComponent("warnings.sqlite").path)
         let warnings = try await warningStore.warnings(for: "user-2", guild_id: "guild")
         #expect(warnings.count == 1)
         #expect(warnings.first?.reason == "Too much chaos.")
+        #expect(moderatorPayload.content?.hasPrefix("Warning recorded as `") == true)
     }
 
     @Test
@@ -198,22 +206,28 @@ struct DiscordInteractionRouterTests {
         )
 
         let requests = stub.requests()
-        #expect(requests.count == 3)
+        #expect(requests.count == 4)
 
-        let roleRequest = try #require(requests.first)
+        let deferredRequest = try #require(requests.first)
+        #expect(deferredRequest.url?.path == "/api/v10/interactions/interaction-arrest/token-interaction-arrest/callback")
+        let deferredPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: deferredRequest)
+        #expect(deferredPayload.type == DiscordInteractionCallbackType.deferredChannelMessageWithSource)
+        #expect(deferredPayload.data?.flags == 64)
+
+        let roleRequest = requests[1]
         #expect(roleRequest.httpMethod == "PUT")
         #expect(roleRequest.url?.path == "/api/v10/guilds/guild/members/user-9/roles/819657472209977404")
 
-        let followupRequest = requests[1]
+        let callbackRequest = requests[2]
+        #expect(callbackRequest.httpMethod == "PATCH")
+        #expect(callbackRequest.url?.path == "/api/v10/webhooks/app/token-interaction-arrest/messages/@original")
+        let callbackPayload = try decodeRequestBody(DiscordMessageCreate.self, from: callbackRequest)
+        #expect(callbackPayload.content == "Applied the arrest role to <@user-9>.")
+
+        let followupRequest = requests[3]
         #expect(followupRequest.url?.path == "/api/v10/channels/source-channel/messages")
         let followupPayload = try decodeRequestBody(DiscordMessageCreate.self, from: followupRequest)
         #expect(followupPayload.content == "<@user-1> applied the arrest role to <@user-9>.")
-
-        let callbackRequest = try #require(requests.last)
-        #expect(callbackRequest.url?.path == "/api/v10/interactions/interaction-arrest/token-interaction-arrest/callback")
-        let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
-        #expect(callbackPayload.data?.content == "Applied the arrest role to <@user-9>.")
-        #expect(callbackPayload.data?.flags == 64)
     }
 
     @Test
@@ -240,22 +254,28 @@ struct DiscordInteractionRouterTests {
         )
 
         let requests = stub.requests()
-        #expect(requests.count == 3)
+        #expect(requests.count == 4)
 
-        let roleRequest = try #require(requests.first)
+        let deferredRequest = try #require(requests.first)
+        #expect(deferredRequest.url?.path == "/api/v10/interactions/interaction-bailout/token-interaction-bailout/callback")
+        let deferredPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: deferredRequest)
+        #expect(deferredPayload.type == DiscordInteractionCallbackType.deferredChannelMessageWithSource)
+        #expect(deferredPayload.data?.flags == 64)
+
+        let roleRequest = requests[1]
         #expect(roleRequest.httpMethod == "DELETE")
         #expect(roleRequest.url?.path == "/api/v10/guilds/guild/members/user-9/roles/819657472209977404")
 
-        let followupRequest = requests[1]
+        let callbackRequest = requests[2]
+        #expect(callbackRequest.httpMethod == "PATCH")
+        #expect(callbackRequest.url?.path == "/api/v10/webhooks/app/token-interaction-bailout/messages/@original")
+        let callbackPayload = try decodeRequestBody(DiscordMessageCreate.self, from: callbackRequest)
+        #expect(callbackPayload.content == "Removed the arrest role from <@user-9>.")
+
+        let followupRequest = requests[3]
         #expect(followupRequest.url?.path == "/api/v10/channels/source-channel/messages")
         let followupPayload = try decodeRequestBody(DiscordMessageCreate.self, from: followupRequest)
         #expect(followupPayload.content == "<@user-1> removed the arrest role from <@user-9>.")
-
-        let callbackRequest = try #require(requests.last)
-        #expect(callbackRequest.url?.path == "/api/v10/interactions/interaction-bailout/token-interaction-bailout/callback")
-        let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
-        #expect(callbackPayload.data?.content == "Removed the arrest role from <@user-9>.")
-        #expect(callbackPayload.data?.flags == 64)
     }
 
     @Test

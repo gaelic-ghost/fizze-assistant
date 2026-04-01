@@ -21,6 +21,25 @@ struct InteractionCallbackPayload: Codable, Sendable {
 extension DiscordInteractionRouter {
     // MARK: Response Helpers
 
+    func deferResponse(to interaction: DiscordInteraction, ephemeral: Bool) async throws {
+        let payload = InteractionCallbackPayload(
+            type: DiscordInteractionCallbackType.deferredChannelMessageWithSource,
+            data: DiscordInteractionCallbackData(
+                content: nil,
+                embeds: nil,
+                components: nil,
+                flags: ephemeral ? 64 : nil,
+                custom_id: nil,
+                title: nil
+            )
+        )
+        try await restClient.createInteractionResponse(
+            interaction_id: interaction.id,
+            token: interaction.token,
+            payload: payload
+        )
+    }
+
     func respond(to interaction: DiscordInteraction, content: String, ephemeral: Bool) async throws {
         try await respond(
             to: interaction,
@@ -42,6 +61,29 @@ extension DiscordInteractionRouter {
         )
         try await restClient.createInteractionResponse(
             interaction_id: interaction.id,
+            token: interaction.token,
+            payload: payload
+        )
+    }
+
+    func editOriginalResponse(to interaction: DiscordInteraction, content: String) async throws {
+        try await editOriginalResponse(
+            to: interaction,
+            payload: DiscordMessageCreate(content: content, embeds: nil, components: nil, flags: nil)
+        )
+    }
+
+    func editOriginalResponse(to interaction: DiscordInteraction, payload: DiscordMessageCreate) async throws {
+        try await restClient.editOriginalInteractionResponse(
+            application_id: interaction.application_id,
+            token: interaction.token,
+            payload: payload
+        )
+    }
+
+    func createInteractionFollowup(to interaction: DiscordInteraction, payload: DiscordMessageCreate) async throws {
+        try await restClient.createInteractionFollowup(
+            application_id: interaction.application_id,
             token: interaction.token,
             payload: payload
         )

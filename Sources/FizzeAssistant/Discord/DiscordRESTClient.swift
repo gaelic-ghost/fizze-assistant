@@ -10,7 +10,10 @@ struct DiscordRESTClient {
     private let session: URLSession
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let rateLimitCoordinator: DiscordRateLimitCoordinator
+    private let invalidRequestTracker: DiscordInvalidRequestTracker
     private let maxRetryAttempts = 5
+    private let requestTimeoutSeconds: TimeInterval = 15
 
     // MARK: Lifecycle
 
@@ -31,6 +34,8 @@ struct DiscordRESTClient {
 
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
+        self.rateLimitCoordinator = DiscordRateLimitCoordinator()
+        self.invalidRequestTracker = DiscordInvalidRequestTracker()
     }
 
     // MARK: REST Helpers
@@ -88,6 +93,24 @@ struct DiscordRESTClient {
 
     func createInteractionResponse(interaction_id: DiscordSnowflake, token: String, payload: InteractionCallbackPayload) async throws {
         let path = "/interactions/\(interaction_id)/\(token)/callback"
+        _ = try await emptyRequest(path: path, method: "POST", body: payload, requiresBotAuthorization: false)
+    }
+
+    func editOriginalInteractionResponse(
+        application_id: DiscordSnowflake,
+        token: String,
+        payload: DiscordMessageCreate
+    ) async throws {
+        let path = "/webhooks/\(application_id)/\(token)/messages/@original"
+        _ = try await emptyRequest(path: path, method: "PATCH", body: payload, requiresBotAuthorization: false)
+    }
+
+    func createInteractionFollowup(
+        application_id: DiscordSnowflake,
+        token: String,
+        payload: DiscordMessageCreate
+    ) async throws {
+        let path = "/webhooks/\(application_id)/\(token)"
         _ = try await emptyRequest(path: path, method: "POST", body: payload, requiresBotAuthorization: false)
     }
 
@@ -159,6 +182,7 @@ struct DiscordRESTClient {
         body: Data?,
         requiresBotAuthorization: Bool = true
     ) async throws -> Data {
+        let descriptor = RequestDescriptor(path: path, method: method, requiresBotAuthorization: requiresBotAuthorization)
         let normalizedPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
         var components = URLComponents(url: baseURL.appendingPathComponent(normalizedPath), resolvingAgainstBaseURL: false)
         if !queryItems.isEmpty {
@@ -172,6 +196,7 @@ struct DiscordRESTClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.httpBody = body
+        request.timeoutInterval = requestTimeoutSeconds
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         if requiresBotAuthorization {
@@ -183,10 +208,12 @@ struct DiscordRESTClient {
             "path": .string(path),
         ])
 
-        return try await performRawRequest(request, path: path, attempt: 0)
+        return try await performRawRequest(request, descriptor: descriptor, attempt: 0)
     }
 
-    private func performRawRequest(_ request: URLRequest, path: String, attempt: Int) async throws -> Data {
+    private func performRawRequest(_ request: URLRequest, descriptor: RequestDescriptor, attempt: Int) async throws -> Data {
+        try await rateLimitCoordinator.waitIfNeeded(for: descriptor)
+
         let data: Data
         let response: URLResponse
         do {
@@ -194,22 +221,30 @@ struct DiscordRESTClient {
         } catch let error as CancellationError {
             throw error
         } catch {
-            if shouldRetryTransportError(error, request: request, attempt: attempt) {
+            if shouldRetryTransportError(error, descriptor: descriptor, attempt: attempt) {
                 let delay = transportRetryDelaySeconds(forAttempt: attempt)
                 logger.warning("DiscordRESTClient.performRawRequest: the network dropped during a Discord API call, so the bot will retry this idempotent route with backoff.", metadata: [
-                    "path": .string(path),
+                    "path": .string(descriptor.path),
                     "retry_after_seconds": .string(String(delay)),
                     "attempt": .string(String(attempt + 1)),
                     "error": .string(String(describing: error)),
                 ])
                 try await Task.sleep(for: .seconds(delay))
-                return try await performRawRequest(request, path: path, attempt: attempt + 1)
+                return try await performRawRequest(request, descriptor: descriptor, attempt: attempt + 1)
             }
             throw error
         }
         guard let http = response as? HTTPURLResponse else {
             throw RESTError.invalidResponse
         }
+
+        let rateLimit = RateLimitObservation(response: http, body: data)
+        await rateLimitCoordinator.record(rateLimit, for: descriptor)
+
+        if http.statusCode == 401, descriptor.requiresBotAuthorization {
+            await rateLimitCoordinator.markBotAuthorizationRejected()
+        }
+        await logInvalidRequestIfNeeded(statusCode: http.statusCode, scope: rateLimit.scope, descriptor: descriptor)
 
         if (200 ... 299).contains(http.statusCode) {
             return data
@@ -218,32 +253,33 @@ struct DiscordRESTClient {
         if http.statusCode == 429, attempt < maxRetryAttempts {
             let delay = rateLimitDelay(response: http, body: data)
             logger.warning("DiscordRESTClient.performRawRequest: Discord asked the bot to slow down on this API route, so the request will pause briefly and retry.", metadata: [
-                "path": .string(path),
+                "path": .string(descriptor.path),
+                "rate_limit_scope": .string(rateLimit.scope ?? "unknown"),
                 "retry_after_seconds": .string(String(delay)),
                 "attempt": .string(String(attempt + 1)),
             ])
             try await Task.sleep(for: .seconds(delay))
-            return try await performRawRequest(request, path: path, attempt: attempt + 1)
+            return try await performRawRequest(request, descriptor: descriptor, attempt: attempt + 1)
         }
 
-        if (500 ... 599).contains(http.statusCode), attempt < maxRetryAttempts {
+        if (500 ... 599).contains(http.statusCode), descriptor.policy.allowsServerRetry, attempt < maxRetryAttempts {
             let delay = min(pow(2.0, Double(attempt)), 30.0)
             logger.warning("DiscordRESTClient.performRawRequest: Discord returned a temporary server error for this API route, so the request will retry with backoff.", metadata: [
-                "path": .string(path),
+                "path": .string(descriptor.path),
                 "status_code": .string(String(http.statusCode)),
                 "retry_after_seconds": .string(String(delay)),
                 "attempt": .string(String(attempt + 1)),
             ])
             try await Task.sleep(for: .seconds(delay))
-            return try await performRawRequest(request, path: path, attempt: attempt + 1)
+            return try await performRawRequest(request, descriptor: descriptor, attempt: attempt + 1)
         }
 
         throw RESTError.discordError(statusCode: http.statusCode, body: String(data: data, encoding: .utf8) ?? "<unreadable>")
     }
 
-    private func shouldRetryTransportError(_ error: Error, request: URLRequest, attempt: Int) -> Bool {
+    private func shouldRetryTransportError(_ error: Error, descriptor: RequestDescriptor, attempt: Int) -> Bool {
         guard attempt < maxRetryAttempts else { return false }
-        guard isIdempotentForRetry(request: request) else { return false }
+        guard descriptor.policy.allowsTransportRetry else { return false }
 
         if let urlError = error as? URLError {
             switch urlError.code {
@@ -264,12 +300,14 @@ struct DiscordRESTClient {
         }
     }
 
-    private func isIdempotentForRetry(request: URLRequest) -> Bool {
-        switch request.httpMethod?.uppercased() {
-        case "GET", "PUT", "DELETE":
-            return true
-        default:
-            return false
+    private func logInvalidRequestIfNeeded(statusCode: Int, scope: String?, descriptor: RequestDescriptor) async {
+        if let count = await invalidRequestTracker.record(statusCode: statusCode, scope: scope) {
+            logger.warning("DiscordRESTClient.performRawRequest: the bot is accumulating invalid Discord API requests unusually quickly, which can lead to a temporary Cloudflare restriction if it continues.", metadata: [
+                "invalid_request_count_10m": .string(String(count)),
+                "path": .string(descriptor.path),
+                "status_code": .string(String(statusCode)),
+                "rate_limit_scope": .string(scope ?? "none"),
+            ])
         }
     }
 
@@ -300,6 +338,7 @@ struct DiscordRESTClient {
 enum RESTError: LocalizedError {
     case invalidURL(String)
     case invalidResponse
+    case authenticationRejected
     case discordError(statusCode: Int, body: String)
 
     var errorDescription: String? {
@@ -308,8 +347,250 @@ enum RESTError: LocalizedError {
             return "DiscordRESTClient.request: the bot could not build a valid Discord URL for path `\(path)`. The most likely cause is a malformed route string in the code."
         case .invalidResponse:
             return "DiscordRESTClient.performRawRequest: Discord returned a response that was not valid HTTP. The most likely cause is a transport-level failure between the bot and the Discord API."
+        case .authenticationRejected:
+            return "DiscordRESTClient.performRawRequest: Discord rejected the bot token with HTTP 401, so further authenticated API calls are paused for this process. The most likely cause is that the configured bot token is invalid, revoked, or belongs to a different application."
         case let .discordError(statusCode, body):
             return "DiscordRESTClient.performRawRequest: Discord responded with HTTP \(statusCode) for this API call. Response body: \(body). The most likely cause is a missing permission, an unknown resource ID, or a rate-limit response that exceeded the retry policy."
+        }
+    }
+}
+
+private struct RequestDescriptor: Sendable {
+    // MARK: Stored Properties
+
+    let path: String
+    let method: String
+    let requiresBotAuthorization: Bool
+    let routeKey: String
+    let partitionKey: String?
+    let routeThrottleKey: String
+    let policy: RequestPolicy
+
+    // MARK: Lifecycle
+
+    init(path: String, method: String, requiresBotAuthorization: Bool) {
+        self.path = path
+        self.method = method.uppercased()
+        self.requiresBotAuthorization = requiresBotAuthorization
+        self.partitionKey = Self.partitionKey(for: path)
+        self.routeKey = "\(self.method) \(Self.canonicalRoutePath(path))"
+        self.routeThrottleKey = "\(routeKey)|\(partitionKey ?? "-")"
+        self.policy = RequestPolicy(path: path, method: self.method, requiresBotAuthorization: requiresBotAuthorization)
+    }
+
+    // MARK: Private Helpers
+
+    private static func partitionKey(for path: String) -> String? {
+        let segments = path.split(separator: "/")
+        guard let resource = segments.first else { return nil }
+
+        switch resource {
+        case "channels" where segments.count > 1:
+            return "channel:\(segments[1])"
+        case "guilds" where segments.count > 1:
+            return "guild:\(segments[1])"
+        case "webhooks" where segments.count > 2:
+            return "webhook:\(segments[1]):\(segments[2])"
+        default:
+            return nil
+        }
+    }
+
+    private static func canonicalRoutePath(_ path: String) -> String {
+        var segments = path.split(separator: "/").map(String.init)
+        if segments.count > 1 {
+            switch segments[0] {
+            case "channels":
+                segments[1] = "{channel_id}"
+            case "guilds":
+                segments[1] = "{guild_id}"
+            case "webhooks":
+                segments[1] = "{webhook_id}"
+                if segments.count > 2 {
+                    segments[2] = "{webhook_token}"
+                }
+            default:
+                break
+            }
+        }
+        return "/" + segments.joined(separator: "/")
+    }
+}
+
+private struct RequestPolicy: Sendable {
+    // MARK: Stored Properties
+
+    let allowsTransportRetry: Bool
+    let allowsServerRetry: Bool
+    let bypassBotGlobalLimit: Bool
+
+    // MARK: Lifecycle
+
+    init(path: String, method: String, requiresBotAuthorization: Bool) {
+        let normalizedMethod = method.uppercased()
+        let isInteractionCallback = path.hasPrefix("/interactions/")
+        let isInteractionWebhook = path.hasPrefix("/webhooks/")
+        let isInteractionWebhookEdit = isInteractionWebhook && (normalizedMethod == "PATCH" || normalizedMethod == "DELETE")
+        let isIdempotentStandard = ["GET", "PUT", "DELETE"].contains(normalizedMethod)
+
+        self.allowsTransportRetry = isIdempotentStandard || isInteractionWebhookEdit
+        self.allowsServerRetry = isIdempotentStandard || isInteractionWebhookEdit
+        self.bypassBotGlobalLimit = !requiresBotAuthorization || isInteractionCallback || isInteractionWebhook
+    }
+}
+
+private struct RateLimitObservation: Sendable {
+    // MARK: Stored Properties
+
+    let bucket: String?
+    let remaining: Int?
+    let resetAfter: Double?
+    let retryAfter: Double?
+    let scope: String?
+    let isGlobal: Bool
+
+    // MARK: Lifecycle
+
+    init(response: HTTPURLResponse, body: Data) {
+        self.bucket = response.value(forHTTPHeaderField: "X-RateLimit-Bucket")
+        self.remaining = response.value(forHTTPHeaderField: "X-RateLimit-Remaining").flatMap(Int.init)
+        self.resetAfter = response.value(forHTTPHeaderField: "X-RateLimit-Reset-After").flatMap(Double.init)
+        self.retryAfter = RateLimitObservation.retryAfter(response: response, body: body)
+        self.scope = response.value(forHTTPHeaderField: "X-RateLimit-Scope")
+        self.isGlobal = response.value(forHTTPHeaderField: "X-RateLimit-Global")?.lowercased() == "true"
+    }
+
+    private static func retryAfter(response: HTTPURLResponse, body: Data) -> Double? {
+        if let header = response.value(forHTTPHeaderField: "Retry-After"), let value = Double(header) {
+            return value
+        }
+
+        if
+            let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+            let retryAfter = object["retry_after"] as? Double
+        {
+            return retryAfter
+        }
+
+        return nil
+    }
+}
+
+private actor DiscordRateLimitCoordinator {
+    // MARK: Stored Properties
+
+    private var bucketIDByRouteKey: [String: String] = [:]
+    private var blockedUntilByBucketKey: [String: Date] = [:]
+    private var blockedUntilByRouteKey: [String: Date] = [:]
+    private var globalBlockedUntil: Date?
+    private var botAuthorizationRejected = false
+
+    // MARK: Public API
+
+    func waitIfNeeded(for descriptor: RequestDescriptor) async throws {
+        if descriptor.requiresBotAuthorization && botAuthorizationRejected {
+            throw RESTError.authenticationRejected
+        }
+
+        let now = Date()
+        let waitUntil = [
+            applicableGlobalBlock(for: descriptor),
+            applicableBucketBlock(for: descriptor),
+            blockedUntilByRouteKey[descriptor.routeThrottleKey],
+        ]
+        .compactMap { $0 }
+        .max() ?? now
+
+        guard waitUntil > now else { return }
+        try await Task.sleep(for: .seconds(waitUntil.timeIntervalSince(now)))
+    }
+
+    func record(_ observation: RateLimitObservation, for descriptor: RequestDescriptor) {
+        let now = Date()
+
+        if let bucket = observation.bucket {
+            bucketIDByRouteKey[descriptor.routeKey] = bucket
+        }
+
+        if observation.isGlobal, let retryAfter = observation.retryAfter {
+            globalBlockedUntil = now.addingTimeInterval(retryAfter)
+        }
+
+        if let retryAfter = observation.retryAfter {
+            let until = now.addingTimeInterval(retryAfter)
+            if let bucket = observation.bucket {
+                blockedUntilByBucketKey[scopedBucketKey(bucketID: bucket, partitionKey: descriptor.partitionKey)] = until
+                blockedUntilByRouteKey.removeValue(forKey: descriptor.routeThrottleKey)
+            } else {
+                blockedUntilByRouteKey[descriptor.routeThrottleKey] = until
+            }
+            return
+        }
+
+        if let bucket = observation.bucket, let remaining = observation.remaining, remaining == 0, let resetAfter = observation.resetAfter {
+            blockedUntilByBucketKey[scopedBucketKey(bucketID: bucket, partitionKey: descriptor.partitionKey)] = now.addingTimeInterval(resetAfter)
+        }
+    }
+
+    func markBotAuthorizationRejected() {
+        botAuthorizationRejected = true
+    }
+
+    // MARK: Private Helpers
+
+    private func applicableGlobalBlock(for descriptor: RequestDescriptor) -> Date? {
+        guard !descriptor.policy.bypassBotGlobalLimit else { return nil }
+        return globalBlockedUntil
+    }
+
+    private func applicableBucketBlock(for descriptor: RequestDescriptor) -> Date? {
+        guard let bucketID = bucketIDByRouteKey[descriptor.routeKey] else { return nil }
+        return blockedUntilByBucketKey[scopedBucketKey(bucketID: bucketID, partitionKey: descriptor.partitionKey)]
+    }
+
+    private func scopedBucketKey(bucketID: String, partitionKey: String?) -> String {
+        if let partitionKey {
+            return "\(bucketID)|\(partitionKey)"
+        }
+        return bucketID
+    }
+}
+
+private actor DiscordInvalidRequestTracker {
+    // MARK: Stored Properties
+
+    private var timestamps: [Date] = []
+    private var lastWarningAt: Date?
+    private let threshold = 100
+    private let windowSeconds: TimeInterval = 600
+    private let warningCooldownSeconds: TimeInterval = 60
+
+    // MARK: Public API
+
+    func record(statusCode: Int, scope: String?) -> Int? {
+        guard shouldCount(statusCode: statusCode, scope: scope) else { return nil }
+
+        let now = Date()
+        timestamps.append(now)
+        timestamps.removeAll { now.timeIntervalSince($0) > windowSeconds }
+
+        guard timestamps.count >= threshold else { return nil }
+        guard lastWarningAt.map({ now.timeIntervalSince($0) > warningCooldownSeconds }) ?? true else { return nil }
+
+        lastWarningAt = now
+        return timestamps.count
+    }
+
+    // MARK: Private Helpers
+
+    private func shouldCount(statusCode: Int, scope: String?) -> Bool {
+        switch statusCode {
+        case 401, 403:
+            return true
+        case 429:
+            return scope?.lowercased() != "shared"
+        default:
+            return false
         }
     }
 }

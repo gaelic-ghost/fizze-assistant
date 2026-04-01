@@ -318,6 +318,7 @@ enum DiscordInteractionType {
 
 enum DiscordInteractionCallbackType {
     static let channelMessageWithSource = 4
+    static let deferredChannelMessageWithSource = 5
     static let modal = 9
 }
 
