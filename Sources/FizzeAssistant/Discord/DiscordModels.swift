@@ -88,6 +88,7 @@ struct DiscordInteraction: Codable, Sendable {
     var application_id: DiscordSnowflake
     var type: Int
     var token: String
+    var channel_id: DiscordSnowflake?
     var member: DiscordInteractionMember?
     var data: DiscordInteractionData?
 }

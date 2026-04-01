@@ -28,20 +28,30 @@ extension DiscordInteractionRouter {
 
     private func handleArrestCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration) async throws {
         let userID = try requireOption(named: "user", from: data, commandName: "arrest").stringValueRequired(commandName: "arrest", optionName: "user")
+        let moderatorID = interaction.member?.user?.id ?? "unknown"
         try await restClient.addRole(
             to: userID,
             guild_id: configuration.guild_id,
             role_id: Self.arrestRoleID
+        )
+        try await postVisibleModerationFollowup(
+            for: interaction,
+            content: "<@\(moderatorID)> applied the arrest role to <@\(userID)>."
         )
         try await respond(to: interaction, content: "Applied the arrest role to <@\(userID)>.", ephemeral: true)
     }
 
     private func handleBailoutCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration) async throws {
         let userID = try requireOption(named: "user", from: data, commandName: "bailout").stringValueRequired(commandName: "bailout", optionName: "user")
+        let moderatorID = interaction.member?.user?.id ?? "unknown"
         try await restClient.removeRole(
             from: userID,
             guild_id: configuration.guild_id,
             role_id: Self.arrestRoleID
+        )
+        try await postVisibleModerationFollowup(
+            for: interaction,
+            content: "<@\(moderatorID)> removed the arrest role from <@\(userID)>."
         )
         try await respond(to: interaction, content: "Removed the arrest role from <@\(userID)>.", ephemeral: true)
     }
@@ -73,6 +83,10 @@ extension DiscordInteractionRouter {
             try await restClient.createMessage(channel_id: dmChannel.id, content: dmMessage)
         }
 
+        try await postVisibleModerationFollowup(
+            for: interaction,
+            content: "<@\(moderator_id)> warned <@\(user_id)>."
+        )
         try await respond(to: interaction, content: "Warning recorded as `\(warning.id)`.", ephemeral: true)
     }
 
@@ -86,13 +100,32 @@ extension DiscordInteractionRouter {
     private func handleClearWarningCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData) async throws {
         let warningID = try requireOption(named: "warning_id", from: data, commandName: "clear-warning").stringValueRequired(commandName: "clear-warning", optionName: "warning_id")
         let deleted = try await warningStore.deleteWarning(id: warningID)
+        let moderatorID = interaction.member?.user?.id ?? "unknown"
+        if deleted {
+            try await postVisibleModerationFollowup(
+                for: interaction,
+                content: "<@\(moderatorID)> cleared warning `\(warningID)`."
+            )
+        }
         try await respond(to: interaction, content: deleted ? "Deleted warning `\(warningID)`." : "No warning found with ID `\(warningID)`.", ephemeral: true)
     }
 
     private func handleClearWarningsCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration) async throws {
         let user_id = try requireOption(named: "user", from: data, commandName: "clear-warnings").stringValueRequired(commandName: "clear-warnings", optionName: "user")
         let deleted = try await warningStore.deleteWarnings(for: user_id, guild_id: configuration.guild_id)
+        let moderatorID = interaction.member?.user?.id ?? "unknown"
+        if deleted > 0 {
+            try await postVisibleModerationFollowup(
+                for: interaction,
+                content: "<@\(moderatorID)> cleared \(deleted) warnings for <@\(user_id)>."
+            )
+        }
         try await respond(to: interaction, content: "Deleted \(deleted) warnings for <@\(user_id)>.", ephemeral: true)
+    }
+
+    private func postVisibleModerationFollowup(for interaction: DiscordInteraction, content: String) async throws {
+        guard let channelID = interaction.channel_id else { return }
+        try await restClient.createMessage(channel_id: channelID, content: content)
     }
 
     private func formatWarningHistory(_ warnings: [WarningRecord], for userID: String) -> String {

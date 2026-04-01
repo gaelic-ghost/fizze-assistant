@@ -160,9 +160,13 @@ struct DiscordInteractionRouterTests {
         )
 
         let requests = stub.requests()
-        #expect(requests.count == 2)
+        #expect(requests.count == 3)
         #expect(requests.first?.url?.path == "/api/v10/channels/mod-log-channel/messages")
+        #expect(requests[1].url?.path == "/api/v10/channels/source-channel/messages")
         #expect(requests.last?.url?.path == "/api/v10/interactions/interaction-warn/token-interaction-warn/callback")
+
+        let channelFollowup = try decodeRequestBody(DiscordMessageCreate.self, from: requests[1])
+        #expect(channelFollowup.content == "<@user-1> warned <@user-2>.")
 
         let warningStore = try WarningStore(path: rootURL.appendingPathComponent("warnings.sqlite").path)
         let warnings = try await warningStore.warnings(for: "user-2", guild_id: "guild")
@@ -194,11 +198,16 @@ struct DiscordInteractionRouterTests {
         )
 
         let requests = stub.requests()
-        #expect(requests.count == 2)
+        #expect(requests.count == 3)
 
         let roleRequest = try #require(requests.first)
         #expect(roleRequest.httpMethod == "PUT")
         #expect(roleRequest.url?.path == "/api/v10/guilds/guild/members/user-9/roles/819657472209977404")
+
+        let followupRequest = requests[1]
+        #expect(followupRequest.url?.path == "/api/v10/channels/source-channel/messages")
+        let followupPayload = try decodeRequestBody(DiscordMessageCreate.self, from: followupRequest)
+        #expect(followupPayload.content == "<@user-1> applied the arrest role to <@user-9>.")
 
         let callbackRequest = try #require(requests.last)
         #expect(callbackRequest.url?.path == "/api/v10/interactions/interaction-arrest/token-interaction-arrest/callback")
@@ -231,11 +240,16 @@ struct DiscordInteractionRouterTests {
         )
 
         let requests = stub.requests()
-        #expect(requests.count == 2)
+        #expect(requests.count == 3)
 
         let roleRequest = try #require(requests.first)
         #expect(roleRequest.httpMethod == "DELETE")
         #expect(roleRequest.url?.path == "/api/v10/guilds/guild/members/user-9/roles/819657472209977404")
+
+        let followupRequest = requests[1]
+        #expect(followupRequest.url?.path == "/api/v10/channels/source-channel/messages")
+        let followupPayload = try decodeRequestBody(DiscordMessageCreate.self, from: followupRequest)
+        #expect(followupPayload.content == "<@user-1> removed the arrest role from <@user-9>.")
 
         let callbackRequest = try #require(requests.last)
         #expect(callbackRequest.url?.path == "/api/v10/interactions/interaction-bailout/token-interaction-bailout/callback")
@@ -284,6 +298,7 @@ struct DiscordInteractionRouterTests {
         id: String,
         name: String,
         memberRoles: [String],
+        channelID: String = "source-channel",
         options: [DiscordInteractionOption]? = nil
     ) -> DiscordInteraction {
         DiscordInteraction(
@@ -291,6 +306,7 @@ struct DiscordInteractionRouterTests {
             application_id: "app",
             type: DiscordInteractionType.applicationCommand,
             token: "token-\(id)",
+            channel_id: channelID,
             member: DiscordInteractionMember(
                 user: DiscordUser(id: "user-1", username: "gale", global_name: "Gale"),
                 roles: memberRoles,
@@ -312,6 +328,7 @@ struct DiscordInteractionRouterTests {
             application_id: "app",
             type: DiscordInteractionType.modalSubmit,
             token: "token-\(id)",
+            channel_id: "source-channel",
             member: DiscordInteractionMember(
                 user: DiscordUser(id: "user-1", username: "gale", global_name: "Gale"),
                 roles: memberRoles,
@@ -366,6 +383,7 @@ struct DiscordInteractionRouterTests {
             application_id: "app",
             type: DiscordInteractionType.messageComponent,
             token: "token-\(id)",
+            channel_id: "source-channel",
             member: DiscordInteractionMember(
                 user: DiscordUser(id: "user-1", username: "gale", global_name: "Gale"),
                 roles: memberRoles,
