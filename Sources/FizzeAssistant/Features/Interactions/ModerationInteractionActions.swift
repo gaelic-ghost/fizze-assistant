@@ -3,8 +3,12 @@ import Foundation
 extension DiscordInteractionRouter {
     // MARK: Moderation Commands
 
+    private static let arrestRoleID = "819657472209977404"
+
     func handleModerationCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration, guildName: String) async throws {
         switch data.name ?? "" {
+        case "arrest":
+            try await handleArrestCommand(interaction, data: data, configuration: configuration)
         case "warn":
             try await handleWarnCommand(interaction, data: data, configuration: configuration, guildName: guildName)
         case "warns":
@@ -19,6 +23,16 @@ extension DiscordInteractionRouter {
     }
 
     // MARK: Private Helpers
+
+    private func handleArrestCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration) async throws {
+        let userID = try requireOption(named: "user", from: data, commandName: "arrest").stringValueRequired(commandName: "arrest", optionName: "user")
+        try await restClient.addRole(
+            to: userID,
+            guild_id: configuration.guild_id,
+            role_id: Self.arrestRoleID
+        )
+        try await respond(to: interaction, content: "Applied the arrest role to <@\(userID)>.", ephemeral: true)
+    }
 
     private func handleWarnCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration, guildName: String) async throws {
         guard let mod_log_channel_id = configuration.mod_log_channel_id else {

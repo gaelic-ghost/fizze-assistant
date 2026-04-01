@@ -65,7 +65,7 @@ actor DiscordInteractionRouter {
             try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
             try await handleSayCommand(interaction, data: data, configuration: configuration)
 
-        case "warn", "warns", "clear-warning", "clear-warnings":
+        case "arrest", "warn", "warns", "clear-warning", "clear-warnings":
             try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
             try await handleModerationCommand(interaction, data: data, configuration: configuration, guildName: guildName)
 

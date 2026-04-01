@@ -16,10 +16,14 @@ struct DiscordCommandRegistrarTests {
         let commandNames = registrar.guildCommands.map(\.name)
         #expect(commandNames.contains("this-is-iconic"))
         #expect(commandNames.contains("config"))
+        #expect(commandNames.contains("arrest"))
 
         let configCommand = registrar.guildCommands.first(where: { $0.name == "config" })
         let subcommandNames = configCommand?.options?.map(\.name) ?? []
         #expect(subcommandNames.contains("trigger-add"))
         #expect(subcommandNames.contains("trigger-list"))
+
+        let arrestCommand = registrar.guildCommands.first(where: { $0.name == "arrest" })
+        #expect(arrestCommand?.options?.first?.name == "user")
     }
 }

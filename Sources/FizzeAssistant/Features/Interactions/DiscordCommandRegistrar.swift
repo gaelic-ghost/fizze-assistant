@@ -29,6 +29,13 @@ struct DiscordCommandRegistrar {
                 ]
             ),
             DiscordSlashCommand(
+                name: "arrest",
+                description: "Apply the arrest role to a user.",
+                options: [
+                    DiscordApplicationCommandOption(type: 6, name: "user", description: "User to arrest.", required: true, channel_types: nil),
+                ]
+            ),
+            DiscordSlashCommand(
                 name: "warns",
                 description: "Show warning history for a user.",
                 options: [
