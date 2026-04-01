@@ -259,6 +259,72 @@ struct FizzeBotTests {
         #expect(leavePayload.content == "Ghost was banned.")
     }
 
+    @Test
+    func iconicReplyRetriesAfterTransientNetworkLoss() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let lock = NSLock()
+        var sourceChannelPostAttempts = 0
+        let stub = makeDiscordRESTClient { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("POST", "/api/v10/channels/source-channel/messages"):
+                lock.lock()
+                sourceChannelPostAttempts += 1
+                let currentAttempt = sourceChannelPostAttempts
+                lock.unlock()
+
+                if currentAttempt == 1 {
+                    throw URLError(.networkConnectionLost)
+                }
+
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+
+            case ("GET", "/api/v10/users/@me"):
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data(#"{"id":"bot-user","username":"fizze","global_name":"Fizze Assistant"}"#.utf8)
+                )
+
+            case ("GET", "/api/v10/channels/source-channel/messages"):
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data("[]".utf8)
+                )
+
+            default:
+                return try stubBotRequest(request)
+            }
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.iconic_messages = [
+                    "fizze time": IconicMessageConfiguration(content: "sparkle", embeds: nil),
+                ]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-retry-1",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "FIZZE TIME",
+                    author: DiscordUser(id: "friend-1", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+
+        #expect(sourceChannelPostAttempts == 2)
+    }
+
     // MARK: Helpers
 
     private func stubBotRequest(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {

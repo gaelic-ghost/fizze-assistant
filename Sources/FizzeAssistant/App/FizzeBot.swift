@@ -156,7 +156,12 @@ actor FizzeBot {
             let message = TemplateRenderer.render(configuration.role_assignment_failure_message, user: event.user, guildName: guildName)
             if let mod_log_channel_id = configuration.mod_log_channel_id {
                 do {
-                    try await restClient.createMessage(channel_id: mod_log_channel_id, content: message)
+                    try await restClient.createManagedMessage(
+                        channel_id: mod_log_channel_id,
+                        payload: DiscordMessageCreate(content: message, embeds: nil, components: nil, flags: nil),
+                        kind: .modLogWarning,
+                        logicalTargetID: event.user.id
+                    )
                 } catch {
                     let noticeError = EventHandlingError.memberJoinRoleAssignmentNotice(
                         channelID: mod_log_channel_id,
@@ -183,7 +188,12 @@ actor FizzeBot {
             return
         }
         do {
-            try await restClient.createMessage(channel_id: welcome_channel_id, content: welcome)
+            try await restClient.createManagedMessage(
+                channel_id: welcome_channel_id,
+                payload: DiscordMessageCreate(content: welcome, embeds: nil, components: nil, flags: nil),
+                kind: .welcomePost,
+                logicalTargetID: event.user.id
+            )
         } catch {
             throw EventHandlingError.memberJoinWelcomePost(
                 channelID: welcome_channel_id,
@@ -226,7 +236,12 @@ actor FizzeBot {
             return
         }
         do {
-            try await restClient.createMessage(channel_id: leave_channel_id, content: announcement)
+            try await restClient.createManagedMessage(
+                channel_id: leave_channel_id,
+                payload: DiscordMessageCreate(content: announcement, embeds: nil, components: nil, flags: nil),
+                kind: .leaveAnnouncement,
+                logicalTargetID: event.user.id
+            )
         } catch {
             throw EventHandlingError.memberRemovalAnnouncement(
                 channelID: leave_channel_id,
@@ -270,7 +285,12 @@ actor FizzeBot {
 
     private func sendIconicMessageResponse(_ response: IconicMessageConfiguration, for event: DiscordMessageEvent) async throws {
         do {
-            try await restClient.createMessage(channel_id: event.channel_id, payload: response.discordMessageCreate)
+            try await restClient.createManagedMessage(
+                channel_id: event.channel_id,
+                payload: response.discordMessageCreate,
+                kind: .iconicReply,
+                logicalTargetID: event.id
+            )
         } catch {
             throw EventHandlingError.iconicMessageResponse(
                 channelID: event.channel_id,
@@ -282,7 +302,12 @@ actor FizzeBot {
 
     private func sendMentionResponse(_ response: String, for event: DiscordMessageEvent) async throws {
         do {
-            try await restClient.createMessage(channel_id: event.channel_id, content: response)
+            try await restClient.createManagedMessage(
+                channel_id: event.channel_id,
+                payload: DiscordMessageCreate(content: response, embeds: nil, components: nil, flags: nil),
+                kind: .mentionReply,
+                logicalTargetID: event.id
+            )
         } catch {
             throw EventHandlingError.iconicMessageResponse(
                 channelID: event.channel_id,

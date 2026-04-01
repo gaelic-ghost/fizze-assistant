@@ -77,9 +77,16 @@ extension DiscordInteractionRouter {
                 moderator_user_id: moderator_id,
                 reason: reason
             )
-            try await restClient.createMessage(
+            try await restClient.createManagedMessage(
                 channel_id: mod_log_channel_id,
-                content: "Warning \(warning.id) recorded for <@\(user_id)> by <@\(moderator_id)>: \(reason)"
+                payload: DiscordMessageCreate(
+                    content: "Warning \(warning.id) recorded for <@\(user_id)> by <@\(moderator_id)>: \(reason)",
+                    embeds: nil,
+                    components: nil,
+                    flags: nil
+                ),
+                kind: .modLogWarning,
+                logicalTargetID: warning.id
             )
 
             if configuration.warn_users_via_dm {
@@ -87,7 +94,12 @@ extension DiscordInteractionRouter {
                 let dmMessage = configuration.warning_dm_template
                     .replacingOccurrences(of: "{reason}", with: reason)
                     .replacingOccurrences(of: "{guild_name}", with: guildName)
-                try await restClient.createMessage(channel_id: dmChannel.id, content: dmMessage)
+                try await restClient.createManagedMessage(
+                    channel_id: dmChannel.id,
+                    payload: DiscordMessageCreate(content: dmMessage, embeds: nil, components: nil, flags: nil),
+                    kind: .warningDM,
+                    logicalTargetID: warning.id
+                )
             }
 
             return DeferredModerationOutcome(
@@ -130,7 +142,12 @@ extension DiscordInteractionRouter {
 
     private func postVisibleModerationFollowup(for interaction: DiscordInteraction, content: String) async throws {
         guard let channelID = interaction.channel_id else { return }
-        try await restClient.createMessage(channel_id: channelID, content: content)
+        try await restClient.createManagedMessage(
+            channel_id: channelID,
+            payload: DiscordMessageCreate(content: content, embeds: nil, components: nil, flags: nil),
+            kind: .moderationVisibleFollowup,
+            logicalTargetID: interaction.id
+        )
     }
 
     private func handleDeferredModerationAction(

@@ -119,12 +119,23 @@ struct DiscordInteractionOption: Codable, Sendable {
     var options: [DiscordInteractionOption]? = nil
 }
 
-struct DiscordMessageCreate: Codable, Sendable {
+struct DiscordMessageCreate: Codable, Hashable, Sendable {
     // MARK: Stored Properties
 
     var content: String?
     var embeds: [DiscordEmbed]?
     var components: [DiscordComponent]?
+    var flags: Int?
+}
+
+struct DiscordMessage: Codable, Sendable {
+    // MARK: Stored Properties
+
+    var id: DiscordSnowflake
+    var channel_id: DiscordSnowflake?
+    var content: String
+    var author: DiscordUser
+    var embeds: [DiscordEmbed]?
     var flags: Int?
 }
 

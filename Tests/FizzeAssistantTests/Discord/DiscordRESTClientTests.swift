@@ -263,4 +263,211 @@ struct DiscordRESTClientTests {
         #expect(attempts == 1)
         #expect(stub.requests().count == 1)
     }
+
+    @Test
+    func createInteractionResponseRetriesAfterTransientNetworkLoss() async throws {
+        let lock = NSLock()
+        var attempts = 0
+        let stub = makeDiscordRESTClient { request in
+            lock.lock()
+            attempts += 1
+            let currentAttempt = attempts
+            lock.unlock()
+
+            #expect(request.url?.path == "/api/v10/interactions/interaction-1/token-1/callback")
+            if currentAttempt == 1 {
+                throw URLError(.networkConnectionLost)
+            }
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 204, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+
+        try await stub.client.createInteractionResponse(
+            interaction_id: "interaction-1",
+            token: "token-1",
+            payload: InteractionCallbackPayload(
+                type: DiscordInteractionCallbackType.channelMessageWithSource,
+                data: DiscordInteractionCallbackData(
+                    content: "hello",
+                    embeds: nil,
+                    components: nil,
+                    flags: nil,
+                    custom_id: nil,
+                    title: nil
+                )
+            )
+        )
+
+        #expect(attempts == 2)
+    }
+
+    @Test
+    func createInteractionFollowupRetriesAfterServerError() async throws {
+        let lock = NSLock()
+        var attempts = 0
+        let stub = makeDiscordRESTClient { request in
+            lock.lock()
+            attempts += 1
+            let currentAttempt = attempts
+            lock.unlock()
+
+            #expect(request.url?.path == "/api/v10/webhooks/app-1/token-1")
+            if currentAttempt == 1 {
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 502, httpVersion: nil, headerFields: [:])!,
+                    Data("bad gateway".utf8)
+                )
+            }
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+
+        try await stub.client.createInteractionFollowup(
+            application_id: "app-1",
+            token: "token-1",
+            payload: DiscordMessageCreate(content: "followup", embeds: nil, components: nil, flags: 64)
+        )
+
+        #expect(attempts == 2)
+    }
+
+    @Test
+    func createDMChannelRetriesAfterTransientNetworkLoss() async throws {
+        let lock = NSLock()
+        var attempts = 0
+        let stub = makeDiscordRESTClient { request in
+            lock.lock()
+            attempts += 1
+            let currentAttempt = attempts
+            lock.unlock()
+
+            #expect(request.url?.path == "/api/v10/users/@me/channels")
+            if currentAttempt == 1 {
+                throw URLError(.networkConnectionLost)
+            }
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data(#"{"id":"dm-1","type":1}"#.utf8)
+            )
+        }
+
+        let channel = try await stub.client.createDMChannel(recipient_id: "user-1")
+        #expect(channel.id == "dm-1")
+        #expect(attempts == 2)
+    }
+
+    @Test
+    func managedChannelMessageRetriesAfterTransportLossWhenRecentHistoryShowsNoDelivery() async throws {
+        let lock = NSLock()
+        var postAttempts = 0
+        let stub = makeDiscordRESTClient { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("POST", "/api/v10/channels/channel-1/messages"):
+                lock.lock()
+                postAttempts += 1
+                let currentAttempt = postAttempts
+                lock.unlock()
+
+                if currentAttempt == 1 {
+                    throw URLError(.networkConnectionLost)
+                }
+
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+
+            case ("GET", "/api/v10/users/@me"):
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data(#"{"id":"bot-1","username":"fizze"}"#.utf8)
+                )
+
+            case ("GET", "/api/v10/channels/channel-1/messages"):
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data("[]".utf8)
+                )
+
+            default:
+                Issue.record("Unexpected request in managed retry test: \(request.httpMethod ?? "<nil>") \(request.url?.path ?? "<nil>")")
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 500, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+            }
+        }
+
+        try await stub.client.createManagedMessage(
+            channel_id: "channel-1",
+            payload: DiscordMessageCreate(content: "sparkle", embeds: nil, components: nil, flags: nil),
+            kind: .iconicReply,
+            logicalTargetID: "source-message-1"
+        )
+
+        #expect(postAttempts == 2)
+        let paths = stub.requests().compactMap(\.url?.path)
+        #expect(paths == [
+            "/api/v10/channels/channel-1/messages",
+            "/api/v10/users/@me",
+            "/api/v10/channels/channel-1/messages",
+            "/api/v10/channels/channel-1/messages",
+        ])
+    }
+
+    @Test
+    func managedChannelMessageSuppressesRetryWhenRecentHistoryAlreadyContainsDeliveredMessage() async throws {
+        let lock = NSLock()
+        var postAttempts = 0
+        let stub = makeDiscordRESTClient { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("POST", "/api/v10/channels/channel-1/messages"):
+                lock.lock()
+                postAttempts += 1
+                lock.unlock()
+                throw URLError(.networkConnectionLost)
+
+            case ("GET", "/api/v10/users/@me"):
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data(#"{"id":"bot-1","username":"fizze"}"#.utf8)
+                )
+
+            case ("GET", "/api/v10/channels/channel-1/messages"):
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data(#"[{"id":"message-1","channel_id":"channel-1","content":"sparkle","author":{"id":"bot-1","username":"fizze"},"embeds":[],"flags":null}]"#.utf8)
+                )
+
+            default:
+                Issue.record("Unexpected request in managed dedupe test: \(request.httpMethod ?? "<nil>") \(request.url?.path ?? "<nil>")")
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 500, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+            }
+        }
+
+        try await stub.client.createManagedMessage(
+            channel_id: "channel-1",
+            payload: DiscordMessageCreate(content: "sparkle", embeds: nil, components: nil, flags: nil),
+            kind: .iconicReply,
+            logicalTargetID: "source-message-1"
+        )
+
+        #expect(postAttempts == 1)
+        let paths = stub.requests().compactMap(\.url?.path)
+        #expect(paths == [
+            "/api/v10/channels/channel-1/messages",
+            "/api/v10/users/@me",
+            "/api/v10/channels/channel-1/messages",
+        ])
+    }
 }

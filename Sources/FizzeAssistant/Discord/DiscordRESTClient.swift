@@ -12,6 +12,8 @@ struct DiscordRESTClient {
     private let decoder: JSONDecoder
     private let rateLimitCoordinator: DiscordRateLimitCoordinator
     private let invalidRequestTracker: DiscordInvalidRequestTracker
+    private let messageDeliveryCoordinator: DiscordMessageDeliveryCoordinator
+    private let identityCache: DiscordBotIdentityCache
     private let maxRetryAttempts = 5
     private let requestTimeoutSeconds: TimeInterval = 15
     private let userAgent = "DiscordBot (https://github.com/gaelic-ghost/fizze-assistant, 1.0)"
@@ -37,6 +39,8 @@ struct DiscordRESTClient {
         self.decoder = JSONDecoder()
         self.rateLimitCoordinator = DiscordRateLimitCoordinator()
         self.invalidRequestTracker = DiscordInvalidRequestTracker()
+        self.messageDeliveryCoordinator = DiscordMessageDeliveryCoordinator()
+        self.identityCache = DiscordBotIdentityCache()
     }
 
     // MARK: REST Helpers
@@ -88,8 +92,66 @@ struct DiscordRESTClient {
         try await request(path: "/users/@me/channels", method: "POST", body: DiscordCreateDMRequest(recipient_id: recipient_id))
     }
 
+    func getChannelMessages(channel_id: DiscordSnowflake, limit: Int = 25) async throws -> [DiscordMessage] {
+        try await request(
+            path: "/channels/\(channel_id)/messages",
+            method: "GET",
+            queryItems: [URLQueryItem(name: "limit", value: String(limit))]
+        )
+    }
+
     func upsertGuildCommands(application_id: DiscordSnowflake, guild_id: DiscordSnowflake, commands: [DiscordSlashCommand]) async throws {
         _ = try await emptyRequest(path: "/applications/\(application_id)/guilds/\(guild_id)/commands", method: "PUT", body: commands)
+    }
+
+    func createManagedMessage(
+        channel_id: DiscordSnowflake,
+        payload: DiscordMessageCreate,
+        kind: ManagedDiscordMessageKind,
+        logicalTargetID: String?
+    ) async throws {
+        let delivery = ManagedDiscordMessageDelivery(
+            kind: kind,
+            channelID: channel_id,
+            payload: payload,
+            logicalTargetID: logicalTargetID
+        )
+
+        guard await messageDeliveryCoordinator.shouldSend(delivery) else {
+            logger.info("DiscordRESTClient.createManagedMessage: skipping a duplicate bot-authored channel message because the same delivery key was already completed recently.", metadata: [
+                "channel_id": .string(channel_id),
+                "delivery_kind": .string(kind.rawValue),
+            ])
+            return
+        }
+
+        do {
+            try await createMessage(channel_id: channel_id, payload: payload)
+            await messageDeliveryCoordinator.recordDelivered(delivery)
+            return
+        } catch {
+            guard shouldRecoverManagedMessageSend(error) else {
+                throw error
+            }
+
+            logger.warning("DiscordRESTClient.createManagedMessage: the channel message send ended in an unknown state, so the bot is checking recent Discord history before deciding whether to retry.", metadata: [
+                "channel_id": .string(channel_id),
+                "delivery_kind": .string(kind.rawValue),
+                "error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error)),
+            ])
+
+            if try await recentChannelMessagesContainManagedDelivery(delivery) {
+                await messageDeliveryCoordinator.recordDelivered(delivery)
+                return
+            }
+
+            guard await messageDeliveryCoordinator.shouldRetryAfterUnknownOutcome(delivery) else {
+                throw error
+            }
+
+            try await createMessage(channel_id: channel_id, payload: payload)
+            await messageDeliveryCoordinator.recordDelivered(delivery)
+        }
     }
 
     func createInteractionResponse(interaction_id: DiscordSnowflake, token: String, payload: InteractionCallbackPayload) async throws {
@@ -317,6 +379,45 @@ struct DiscordRESTClient {
         min(pow(2.0, Double(attempt)), 5.0)
     }
 
+    private func shouldRecoverManagedMessageSend(_ error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .notConnectedToInternet:
+                return true
+            default:
+                return false
+            }
+        }
+
+        if let restError = error as? RESTError {
+            switch restError {
+            case let .discordError(statusCode, _):
+                return (500 ... 599).contains(statusCode)
+            default:
+                return false
+            }
+        }
+
+        let nsError = error as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+        switch nsError.code {
+        case NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut, NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost, NSURLErrorDNSLookupFailed, NSURLErrorNotConnectedToInternet:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func recentChannelMessagesContainManagedDelivery(_ delivery: ManagedDiscordMessageDelivery) async throws -> Bool {
+        let botUserID = try await identityCache.botUserID(load: {
+            try await getCurrentUser().id
+        })
+        let recentMessages = try await getChannelMessages(channel_id: delivery.channelID)
+        return recentMessages.contains { message in
+            message.matchesManagedDelivery(delivery, botUserID: botUserID)
+        }
+    }
+
     func rateLimitDelay(response: HTTPURLResponse, body: Data) -> Double {
         if let header = response.value(forHTTPHeaderField: "Retry-After"), let value = Double(header) {
             return max(value, 1)
@@ -335,6 +436,17 @@ struct DiscordRESTClient {
 
         return 1
     }
+}
+
+enum ManagedDiscordMessageKind: String, Sendable {
+    case welcomePost = "welcome_post"
+    case leaveAnnouncement = "leave_announcement"
+    case iconicReply = "iconic_reply"
+    case mentionReply = "mention_reply"
+    case modLogWarning = "mod_log_warning"
+    case sayCommand = "say_command"
+    case moderationVisibleFollowup = "moderation_visible_followup"
+    case warningDM = "warning_dm"
 }
 
 enum RESTError: LocalizedError {
@@ -467,12 +579,113 @@ private struct RequestPolicy: Sendable {
         let normalizedMethod = method.uppercased()
         let isInteractionCallback = path.hasPrefix("/interactions/")
         let isInteractionWebhook = path.hasPrefix("/webhooks/")
+        let isDMCreate = path == "/users/@me/channels"
         let isInteractionWebhookEdit = isInteractionWebhook && (normalizedMethod == "PATCH" || normalizedMethod == "DELETE")
+        let isInteractionWebhookPost = isInteractionWebhook && normalizedMethod == "POST"
+        let isRetryableInteractionCallback = isInteractionCallback && normalizedMethod == "POST"
         let isIdempotentStandard = ["GET", "PUT", "DELETE"].contains(normalizedMethod)
 
-        self.allowsTransportRetry = isIdempotentStandard || isInteractionWebhookEdit
-        self.allowsServerRetry = isIdempotentStandard || isInteractionWebhookEdit
+        self.allowsTransportRetry = isIdempotentStandard || isInteractionWebhookEdit || isInteractionWebhookPost || isRetryableInteractionCallback || isDMCreate
+        self.allowsServerRetry = isIdempotentStandard || isInteractionWebhookEdit || isInteractionWebhookPost || isRetryableInteractionCallback || isDMCreate
         self.bypassBotGlobalLimit = !requiresBotAuthorization || isInteractionCallback || isInteractionWebhook
+    }
+}
+
+private struct ManagedDiscordMessageDelivery: Hashable, Sendable {
+    // MARK: Stored Properties
+
+    let kind: ManagedDiscordMessageKind
+    let channelID: DiscordSnowflake
+    let payload: DiscordMessageCreate
+    let logicalTargetID: String?
+}
+
+private actor DiscordMessageDeliveryCoordinator {
+    // MARK: Stored Properties
+
+    private var deliveredUntilByDelivery: [ManagedDiscordMessageDelivery: Date] = [:]
+    private var retryUsedUntilByDelivery: [ManagedDiscordMessageDelivery: Date] = [:]
+    private let deliveryWindowSeconds: TimeInterval = 15
+
+    // MARK: Public API
+
+    func shouldSend(_ delivery: ManagedDiscordMessageDelivery) -> Bool {
+        pruneExpiredEntries()
+        guard let deliveredUntil = deliveredUntilByDelivery[delivery] else {
+            return true
+        }
+        return deliveredUntil <= Date()
+    }
+
+    func shouldRetryAfterUnknownOutcome(_ delivery: ManagedDiscordMessageDelivery) -> Bool {
+        pruneExpiredEntries()
+        if let retryUsedUntil = retryUsedUntilByDelivery[delivery], retryUsedUntil > Date() {
+            return false
+        }
+        retryUsedUntilByDelivery[delivery] = Date().addingTimeInterval(deliveryWindowSeconds)
+        return true
+    }
+
+    func recordDelivered(_ delivery: ManagedDiscordMessageDelivery) {
+        pruneExpiredEntries()
+        deliveredUntilByDelivery[delivery] = Date().addingTimeInterval(deliveryWindowSeconds)
+        retryUsedUntilByDelivery.removeValue(forKey: delivery)
+    }
+
+    // MARK: Private Helpers
+
+    private func pruneExpiredEntries() {
+        let now = Date()
+        deliveredUntilByDelivery = deliveredUntilByDelivery.filter { $0.value > now }
+        retryUsedUntilByDelivery = retryUsedUntilByDelivery.filter { $0.value > now }
+    }
+}
+
+private actor DiscordBotIdentityCache {
+    // MARK: Stored Properties
+
+    private var cachedBotUserID: DiscordSnowflake?
+
+    // MARK: Public API
+
+    func botUserID(load: () async throws -> DiscordSnowflake) async throws -> DiscordSnowflake {
+        if let cachedBotUserID {
+            return cachedBotUserID
+        }
+
+        let botUserID = try await load()
+        cachedBotUserID = botUserID
+        return botUserID
+    }
+}
+
+private extension DiscordMessage {
+    func matchesManagedDelivery(_ delivery: ManagedDiscordMessageDelivery, botUserID: DiscordSnowflake) -> Bool {
+        guard author.id == botUserID else {
+            return false
+        }
+
+        let sentContent = delivery.payload.content ?? ""
+        let receivedEmbeds = (embeds ?? []).map(\.normalizedForDeliveryComparison)
+        let sentEmbeds = (delivery.payload.embeds ?? []).map(\.normalizedForDeliveryComparison)
+
+        return content == sentContent
+            && receivedEmbeds == sentEmbeds
+            && flags == delivery.payload.flags
+    }
+}
+
+private extension DiscordEmbed {
+    var normalizedForDeliveryComparison: DiscordEmbed {
+        DiscordEmbed(
+            title: title,
+            type: nil,
+            description: description,
+            url: url,
+            color: color,
+            footer: footer,
+            image: image
+        )
     }
 }
 
