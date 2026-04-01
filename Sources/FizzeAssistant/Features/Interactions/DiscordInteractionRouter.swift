@@ -46,7 +46,7 @@ actor DiscordInteractionRouter {
             logger.warning("DiscordInteractionRouter.handle: an interaction hit an error path, and the bot is trying to return a human-readable reply instead of failing silently.", metadata: ["error": .string(String(describing: error))])
             try? await respond(
                 to: interaction,
-                content: (error as? LocalizedError)?.errorDescription ?? "DiscordInteractionRouter.handle: the interaction did not finish cleanly, so the bot sent this fallback reply instead. The most likely cause is a missing Discord permission, an expired wizard step, or a configuration mismatch in `fizze-assistant.json`.",
+                content: (error as? LocalizedError)?.errorDescription ?? "DiscordInteractionRouter.handle: the interaction did not finish cleanly, so the bot sent this fallback reply instead. The most likely cause is a missing Discord permission, an expired wizard step, or a configuration mismatch in the active JSON config file.",
                 ephemeral: true
             )
         }

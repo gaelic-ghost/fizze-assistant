@@ -58,7 +58,8 @@ enum BotApplication {
 
         case .configValidate:
             let configurationFile = await configurationStore.configurationFileContents()
-            print("Configuration path: \(options.config ?? "fizze-assistant.json")")
+            let configurationURL = await configurationStore.configurationURL()
+            print("Configuration path: \(configurationURL.path)")
             if configurationFile.warnings.isEmpty {
                 print("Configuration is ready for runtime use.")
             } else {

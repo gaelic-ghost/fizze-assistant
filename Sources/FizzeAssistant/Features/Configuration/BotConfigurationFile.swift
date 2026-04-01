@@ -155,23 +155,23 @@ struct BotConfigurationFile: Codable, Sendable {
             .map(\.0)
 
         guard missing.isEmpty else {
-            throw UserFacingError("BotConfigurationFile.readyForRuntime: the bot cannot start until these required values are filled in: \(missing.joined(separator: ", ")). The most likely cause is that `fizze-assistant.json` or `DISCORD_BOT_TOKEN` is still incomplete.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: the bot cannot start until these required values are filled in: \(missing.joined(separator: ", ")). The most likely cause is that the active JSON config file or `DISCORD_BOT_TOKEN` is still incomplete.")
         }
 
         guard !allowed_staff_role_ids.isEmpty else {
-            throw UserFacingError("BotConfigurationFile.readyForRuntime: `allowed_staff_role_ids` is empty in `fizze-assistant.json`, so staff commands would have no authorized roles. Add at least one staff role ID and try again.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: `allowed_staff_role_ids` is empty in the active JSON config file, so staff commands would have no authorized roles. Add at least one staff role ID and try again.")
         }
 
         guard !allowed_config_role_ids.isEmpty else {
-            throw UserFacingError("BotConfigurationFile.readyForRuntime: `allowed_config_role_ids` is empty in `fizze-assistant.json`, so `/config` would have no authorized owners. Add at least one config-owner role ID and try again.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: `allowed_config_role_ids` is empty in the active JSON config file, so `/config` would have no authorized owners. Add at least one config-owner role ID and try again.")
         }
 
         guard trigger_cooldown_seconds > 0 else {
-            throw UserFacingError("BotConfigurationFile.readyForRuntime: `trigger_cooldown_seconds` in `fizze-assistant.json` must be greater than zero. The most likely cause is a zero or negative number in the config file.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: `trigger_cooldown_seconds` in the active JSON config file must be greater than zero. The most likely cause is a zero or negative number in the config file.")
         }
 
         guard leave_audit_log_lookback_seconds > 0 else {
-            throw UserFacingError("BotConfigurationFile.readyForRuntime: `leave_audit_log_lookback_seconds` in `fizze-assistant.json` must be greater than zero. The most likely cause is a zero or negative number in the config file.")
+            throw UserFacingError("BotConfigurationFile.readyForRuntime: `leave_audit_log_lookback_seconds` in the active JSON config file must be greater than zero. The most likely cause is a zero or negative number in the config file.")
         }
 
         return BotConfigurationFile(
@@ -347,7 +347,7 @@ struct IconicMessageConfiguration: Codable, Hashable, Sendable {
         let normalizedEmbeds = embeds?.isEmpty == true ? nil : embeds
 
         guard normalizedContent != nil || normalizedEmbeds != nil else {
-            throw UserFacingError("IconicMessageConfiguration.readyForRuntime: iconic message `\(trigger)` must include text content, embeds, or both. The most likely cause is an empty iconic-message entry in `fizze-assistant.json`.")
+            throw UserFacingError("IconicMessageConfiguration.readyForRuntime: iconic message `\(trigger)` must include text content, embeds, or both. The most likely cause is an empty iconic-message entry in the active JSON config file.")
         }
 
         return IconicMessageConfiguration(content: normalizedContent, embeds: normalizedEmbeds)
@@ -356,7 +356,7 @@ struct IconicMessageConfiguration: Codable, Hashable, Sendable {
     static func normalizedTrigger(_ trigger: String) throws -> String {
         let normalized = trigger.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !normalized.isEmpty else {
-            throw UserFacingError("IconicMessageConfiguration.normalizedTrigger: iconic-message triggers cannot be blank. The most likely cause is an empty trigger key in `fizze-assistant.json` or `/config trigger-add`.")
+            throw UserFacingError("IconicMessageConfiguration.normalizedTrigger: iconic-message triggers cannot be blank. The most likely cause is an empty trigger key in the active JSON config file or `/config trigger-add`.")
         }
         return normalized
     }

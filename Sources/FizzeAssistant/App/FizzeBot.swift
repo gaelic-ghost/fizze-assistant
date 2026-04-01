@@ -167,7 +167,7 @@ actor FizzeBot {
                     logger.warning("\(noticeMessage)")
                 }
             } else {
-                logger.warning("FizzeBot.handleMemberJoined: the bot could not post the role-assignment note because `mod_log_channel_id` is still empty in `fizze-assistant.json`. The most likely cause is that the mod log channel has not been configured yet.")
+                logger.warning("FizzeBot.handleMemberJoined: the bot could not post the role-assignment note because `mod_log_channel_id` is still empty in the active JSON config file. The most likely cause is that the mod log channel has not been configured yet.")
             }
             throw EventHandlingError.memberJoinRoleAssignment(
                 userID: event.user.id,
@@ -179,7 +179,7 @@ actor FizzeBot {
 
         let welcome = TemplateRenderer.render(configuration.welcome_message, user: event.user, guildName: guildName)
         guard let welcome_channel_id = configuration.welcome_channel_id else {
-            logger.warning("FizzeBot.handleMemberJoined: the welcome post is paused because `welcome_channel_id` is still empty in `fizze-assistant.json`. The most likely cause is that the welcome channel has not been configured yet.")
+            logger.warning("FizzeBot.handleMemberJoined: the welcome post is paused because `welcome_channel_id` is still empty in the active JSON config file. The most likely cause is that the welcome channel has not been configured yet.")
             return
         }
         do {
@@ -222,7 +222,7 @@ actor FizzeBot {
 
         let announcement = TemplateRenderer.render(template, user: event.user, guildName: guildName)
         guard let leave_channel_id = configuration.leave_channel_id else {
-            logger.warning("FizzeBot.handleMemberRemoved: departure posts are paused because `leave_channel_id` is still empty in `fizze-assistant.json`. The most likely cause is that the leave channel has not been configured yet.")
+            logger.warning("FizzeBot.handleMemberRemoved: departure posts are paused because `leave_channel_id` is still empty in the active JSON config file. The most likely cause is that the leave channel has not been configured yet.")
             return
         }
         do {

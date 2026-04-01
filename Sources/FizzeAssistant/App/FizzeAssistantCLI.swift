@@ -22,7 +22,7 @@ struct FizzeAssistantCLI: AsyncParsableCommand {
 struct SharedOptions: ParsableArguments {
     // MARK: Parsed Options
 
-    @Option(name: .shortAndLong, help: "Optional path to a JSON configuration file.")
+    @Option(name: .shortAndLong, help: "Optional path to a JSON configuration file. Without this flag, the bot prefers `fizze-assistant-local.json`, then falls back to `fizze-assistant.json`.")
     var config: String?
 
     @Flag(help: "Enable extra debug logging.")
@@ -94,7 +94,7 @@ struct ConfigCommand: AsyncParsableCommand {
 
     static let configuration = CommandConfiguration(
         commandName: "config",
-        abstract: "Manage the committed non-secret JSON configuration file.",
+        abstract: "Manage the active non-secret JSON configuration file.",
         subcommands: [
             ConfigShowCommand.self,
             ConfigInitCommand.self,
@@ -108,7 +108,7 @@ struct ConfigShowCommand: AsyncParsableCommand {
 
     static let configuration = CommandConfiguration(
         commandName: "show",
-        abstract: "Print the current non-secret configuration."
+        abstract: "Print the current active non-secret configuration."
     )
 
     // MARK: Parsed Options
@@ -128,7 +128,7 @@ struct ConfigInitCommand: AsyncParsableCommand {
 
     static let configuration = CommandConfiguration(
         commandName: "init",
-        abstract: "Create the JSON configuration file if it does not exist."
+        abstract: "Create the active JSON configuration file if it does not exist."
     )
 
     // MARK: Parsed Options
@@ -148,7 +148,7 @@ struct ConfigValidateCommand: AsyncParsableCommand {
 
     static let configuration = CommandConfiguration(
         commandName: "validate",
-        abstract: "Validate the non-secret configuration setup."
+        abstract: "Validate the active non-secret configuration setup."
     )
 
     // MARK: Parsed Options

@@ -64,7 +64,7 @@ extension DiscordInteractionRouter {
 
     private func handleWarnCommand(_ interaction: DiscordInteraction, data: DiscordInteractionData, configuration: AppConfiguration, guildName: String) async throws {
         guard let mod_log_channel_id = configuration.mod_log_channel_id else {
-            throw UserFacingError("DiscordInteractionRouter.handleWarnCommand: `/warn` needs `mod_log_channel_id` in `fizze-assistant.json` before it can record warnings. The most likely cause is that the mod log channel has not been configured yet.")
+            throw UserFacingError("DiscordInteractionRouter.handleWarnCommand: `/warn` needs `mod_log_channel_id` in the active JSON config file before it can record warnings. The most likely cause is that the mod log channel has not been configured yet.")
         }
 
         let user_id = try requireOption(named: "user", from: data, commandName: "warn").stringValueRequired(commandName: "warn", optionName: "user")

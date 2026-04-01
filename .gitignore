@@ -10,4 +10,5 @@ DerivedData/
 .env.local
 .data/
 fizze-assistant.local.json
+fizze-assistant-local.json
 fizze-assistant.log

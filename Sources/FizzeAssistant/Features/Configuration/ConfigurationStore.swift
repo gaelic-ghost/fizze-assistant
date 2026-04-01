@@ -1,6 +1,11 @@
 import Foundation
 
 actor ConfigurationStore {
+    // MARK: Constants
+
+    static let baselineConfigurationFileName = "fizze-assistant.json"
+    static let localConfigurationFileName = "fizze-assistant-local.json"
+
     // MARK: Stored Properties
 
     private let botToken: String
@@ -19,7 +24,7 @@ actor ConfigurationStore {
 
     static func load(from localConfigURL: URL?, environment: [String: String]) throws -> ConfigurationStore {
         let botToken = environment["DISCORD_BOT_TOKEN"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let configURL = localConfigURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("fizze-assistant.json")
+        let configURL = localConfigURL ?? defaultConfigURL(environment: environment, fileManager: .default)
 
         let configurationFile: BotConfigurationFile
         if FileManager.default.fileExists(atPath: configURL.path) {
@@ -48,6 +53,10 @@ actor ConfigurationStore {
 
     func configurationFileContents() -> BotConfigurationFile {
         configurationFile
+    }
+
+    func configurationURL() -> URL {
+        configURL
     }
 
     // MARK: File Management
@@ -151,6 +160,25 @@ actor ConfigurationStore {
     }
 
     // MARK: Private Helpers
+
+    private static func defaultConfigURL(environment: [String: String], fileManager: FileManager) -> URL {
+        let configuredWorkingDirectory = environment["PWD"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let workingDirectoryPath = configuredWorkingDirectory?.isEmpty == false
+            ? configuredWorkingDirectory!
+            : fileManager.currentDirectoryPath
+        let rootURL = URL(fileURLWithPath: workingDirectoryPath, isDirectory: true)
+        let localURL = rootURL.appendingPathComponent(localConfigurationFileName)
+        if fileManager.fileExists(atPath: localURL.path) {
+            return localURL
+        }
+
+        let baselineURL = rootURL.appendingPathComponent(baselineConfigurationFileName)
+        if fileManager.fileExists(atPath: baselineURL.path) {
+            return baselineURL
+        }
+
+        return localURL
+    }
 
     private func persist(configurationFile: BotConfigurationFile) throws {
         let directoryURL = configURL.deletingLastPathComponent()
