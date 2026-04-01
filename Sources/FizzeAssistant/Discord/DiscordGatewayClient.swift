@@ -1,6 +1,16 @@
 import Foundation
 import Logging
 
+protocol DiscordGatewaySocket: Sendable {
+    func resume()
+    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?)
+    func send(_ message: URLSessionWebSocketTask.Message) async throws
+    func receive() async throws -> URLSessionWebSocketTask.Message
+}
+
+extension URLSessionWebSocketTask: DiscordGatewaySocket {}
+extension URLSessionWebSocketTask: @unchecked Sendable {}
+
 actor DiscordGatewayClient {
     // MARK: Types
 
@@ -21,9 +31,11 @@ actor DiscordGatewayClient {
     private let onEvent: @Sendable (Event) async -> Void
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
-    private let session = URLSession(configuration: .ephemeral)
+    private let makeSocket: @Sendable (URL) -> any DiscordGatewaySocket
+    private let sleep: @Sendable (Duration) async throws -> Void
+    private let reconnectDelayProvider: @Sendable (Int) -> Double
 
-    private var webSocketTask: URLSessionWebSocketTask?
+    private var webSocketTask: (any DiscordGatewaySocket)?
     private var heartbeatTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
     private var sequenceNumber: Int?
@@ -44,10 +56,42 @@ actor DiscordGatewayClient {
         logger: Logger,
         onEvent: @escaping @Sendable (Event) async -> Void
     ) {
+        let session = URLSession(configuration: .ephemeral)
+        self.init(
+            token: token,
+            gatewayURL: gatewayURL,
+            intents: intents,
+            logger: logger,
+            makeSocket: { [session] url in
+                session.webSocketTask(with: url)
+            },
+            sleep: { duration in
+                try await Task.sleep(for: duration)
+            },
+            reconnectDelayProvider: { attempt in
+                Self.defaultReconnectDelaySeconds(forAttempt: attempt)
+            },
+            onEvent: onEvent
+        )
+    }
+
+    init(
+        token: String,
+        gatewayURL: URL,
+        intents: Int,
+        logger: Logger,
+        makeSocket: @escaping @Sendable (URL) -> any DiscordGatewaySocket,
+        sleep: @escaping @Sendable (Duration) async throws -> Void,
+        reconnectDelayProvider: @escaping @Sendable (Int) -> Double,
+        onEvent: @escaping @Sendable (Event) async -> Void
+    ) {
         self.token = token
         self.gatewayURL = gatewayURL
         self.intents = intents
         self.logger = logger
+        self.makeSocket = makeSocket
+        self.sleep = sleep
+        self.reconnectDelayProvider = reconnectDelayProvider
         self.onEvent = onEvent
 
         self.decoder = JSONDecoder()
@@ -73,7 +117,7 @@ actor DiscordGatewayClient {
     private func connect(using url: URL) async throws {
         logger.info("DiscordGatewayClient.connect: opening the live Discord Gateway connection for event streaming.", metadata: ["url": .string(url.absoluteString)])
 
-        let task = session.webSocketTask(with: url)
+        let task = makeSocket(url)
         webSocketTask = task
         task.resume()
 
@@ -96,13 +140,13 @@ actor DiscordGatewayClient {
 
         let targetURL = resumeURL ?? gatewayURL
         do {
-            let delay = reconnectDelaySeconds(forAttempt: reconnectAttempt)
+            let delay = reconnectDelayProvider(reconnectAttempt)
             if delay > 0 {
                 logger.warning("DiscordGatewayClient.reconnect: the Gateway connection needs to reopen, so the bot is waiting briefly before the next attempt.", metadata: [
                     "delay_seconds": .string(String(format: "%.2f", delay)),
                     "attempt": .string(String(reconnectAttempt + 1)),
                 ])
-                try await Task.sleep(for: .seconds(delay))
+                try await sleep(.seconds(delay))
             }
             reconnectAttempt += 1
             try await connect(using: targetURL)
@@ -198,7 +242,7 @@ actor DiscordGatewayClient {
                     "d": sequenceNumber.map { .number(Double($0)) } ?? .null,
                 ])
 
-                try await Task.sleep(nanoseconds: heartbeat_interval_nanoseconds)
+                try await sleep(.nanoseconds(heartbeat_interval_nanoseconds))
             } catch is CancellationError {
                 return
             } catch {
@@ -346,7 +390,7 @@ actor DiscordGatewayClient {
         }
     }
 
-    private func reconnectDelaySeconds(forAttempt attempt: Int) -> Double {
+    private static func defaultReconnectDelaySeconds(forAttempt attempt: Int) -> Double {
         let exponential = min(pow(2.0, Double(attempt)), 30.0)
         let jitter = Double.random(in: 0 ... 0.5)
         return attempt == 0 ? 0.5 + jitter : exponential + jitter

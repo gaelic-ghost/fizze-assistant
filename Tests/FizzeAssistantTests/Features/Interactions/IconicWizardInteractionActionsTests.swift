@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import FizzeAssistant
 
-struct IconicWizardInteractionTests {
+struct IconicWizardInteractionActionsTests {
     // MARK: Tests
 
     @Test
@@ -19,19 +19,6 @@ struct IconicWizardInteractionTests {
         #expect(message.content == nil)
         #expect(message.embeds?.first?.description == content)
         #expect(message.embeds?.first?.image?.url == "https://example.com/first.png")
-    }
-
-    @Test
-    func wizardStateRequiresSameUser() async throws {
-        let store = IconicWizardStateStore()
-        let sessionID = await store.save(trigger: "fizze time", userID: "user-1")
-
-        let draft = try await store.draft(sessionID: sessionID, userID: "user-1")
-        #expect(draft.trigger == "fizze time")
-
-        await #expect(throws: UserFacingError.self) {
-            _ = try await store.draft(sessionID: sessionID, userID: "user-2")
-        }
     }
 
     // MARK: Helpers
