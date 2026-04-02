@@ -130,9 +130,9 @@ For richer iconic messages, `/this-is-iconic` walks through a two-step Discord-n
 
 The resulting iconic message is saved under `iconic_messages` in the active JSON config file, keyed by normalized trigger text. With the default local-override flow, that means `fizze-assistant-local.json` once you create it. Hand-editing the active JSON is still the escape hatch for any richer embed payloads you want to author manually.
 
-Only the dedicated config-owner roles may use `/config`. Normal staff roles can still use the moderation and `/say` commands, but they cannot change bot configuration.
+Only the dedicated config-owner roles may use `/config` and `/this-is-iconic`. Normal staff roles can still use the moderation and `/say` commands, but they cannot change bot configuration or use owner-only bot controls.
 
-Discord members with the native `Administrator` or `Manage Server` permission are also allowed to use staff and config-owner commands, even if their role IDs are not listed explicitly in the local config.
+Discord members with the native `Administrator` or `Manage Server` permission are still allowed to use staff commands, even if their role IDs are not listed explicitly in the local config. That Discord-native fallback no longer applies to config-owner commands, which now require an explicit configured owner role.
 
 The committed config already includes `suggestions_channel_id` so the future bot suggestions workflow can stay in sync across machines through normal git pull/push.
 

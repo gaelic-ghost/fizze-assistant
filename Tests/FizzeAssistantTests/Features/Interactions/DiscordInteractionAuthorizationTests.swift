@@ -61,6 +61,25 @@ struct DiscordInteractionAuthorizationTests {
         )
 
         #expect(member.isStaffAuthorized(for: configuration))
-        #expect(member.isConfigAuthorized(for: configuration))
+        #expect(!member.isConfigAuthorized(for: configuration))
+    }
+
+    @Test
+    func configAuthorizationRejectsManageGuildWithoutConfiguredOwnerRole() {
+        var file = BotConfigurationFile.defaults
+        file.allowed_staff_role_ids = ["staff-role"]
+        file.allowed_config_role_ids = ["owner-role"]
+        let configuration = AppConfiguration(
+            botToken: "token",
+            file: file
+        )
+        let member = DiscordInteractionMember(
+            user: DiscordUser(id: "user-1", username: "gale", global_name: "Gale"),
+            roles: ["staff-role"],
+            permissions: String(DiscordPermission.manageGuild.rawValue)
+        )
+
+        #expect(member.isStaffAuthorized(for: configuration))
+        #expect(!member.isConfigAuthorized(for: configuration))
     }
 }

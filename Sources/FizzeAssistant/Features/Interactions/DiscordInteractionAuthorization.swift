@@ -11,7 +11,7 @@ extension DiscordInteractionRouter {
 
     func ensureConfigAuthorized(member: DiscordInteractionMember?, configuration: AppConfiguration) throws {
         guard member?.isConfigAuthorized(for: configuration) == true else {
-            throw UserFacingError("DiscordInteractionRouter.ensureConfigAuthorized: `/config` is limited to configured config-owner roles, or members with Discord `Administrator` or `Manage Server` permissions. The most likely cause is that your server roles do not match `allowed_config_role_ids` in the active JSON config file yet.")
+            throw UserFacingError("DiscordInteractionRouter.ensureConfigAuthorized: `/config` and other owner-only bot controls are limited to the explicitly configured config-owner roles in `allowed_config_role_ids`. The most likely cause is that your Discord roles do not include the owner role ID expected by the active JSON config file.")
         }
     }
 }
@@ -24,7 +24,7 @@ extension DiscordInteractionMember {
     }
 
     func isConfigAuthorized(for configuration: AppConfiguration) -> Bool {
-        hasServerManagementPrivileges || !Set(roles).isDisjoint(with: configuration.allowed_config_role_ids)
+        !Set(roles).isDisjoint(with: configuration.allowed_config_role_ids)
     }
 
     var hasServerManagementPrivileges: Bool {
