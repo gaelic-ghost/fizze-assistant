@@ -76,7 +76,7 @@ actor DiscordInteractionRouter {
             try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
             try await startThisIsIconicWizard(interaction)
 
-        case "this-isn't-iconic":
+        case "this-isnt-iconic":
             try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
             try await startThisIsntIconicWizard(interaction)
 

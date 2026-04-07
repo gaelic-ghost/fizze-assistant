@@ -186,7 +186,7 @@ struct DiscordInteractionRouterTests {
         await router.handle(
             slashInteraction(
                 id: "interaction-edit-1",
-                name: "this-isn't-iconic",
+                name: "this-isnt-iconic",
                 memberRoles: ["config-role"]
             ),
             guildName: "Guild"

@@ -109,7 +109,7 @@ struct DiscordCommandRegistrar {
                 options: nil
             ),
             DiscordSlashCommand(
-                name: "this-isn't-iconic",
+                name: "this-isnt-iconic",
                 description: "Walk through updating one existing iconic response.",
                 options: nil
             ),
