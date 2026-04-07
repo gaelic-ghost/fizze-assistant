@@ -110,6 +110,61 @@ struct DiscordInteractionData: Codable, Sendable {
     var component_type: Int?
     var options: [DiscordInteractionOption]?
     var components: [DiscordComponent]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case custom_id
+        case component_type
+        case options
+        case components
+    }
+
+    init(
+        id: DiscordSnowflake?,
+        name: String?,
+        custom_id: String?,
+        component_type: Int?,
+        options: [DiscordInteractionOption]?,
+        components: [DiscordComponent]?
+    ) {
+        self.id = id
+        self.name = name
+        self.custom_id = custom_id
+        self.component_type = component_type
+        self.options = options
+        self.components = components
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if let stringID = try? container.decodeIfPresent(String.self, forKey: .id) {
+            id = stringID
+        } else if let intID = try? container.decodeIfPresent(Int64.self, forKey: .id) {
+            id = String(intID)
+        } else if let doubleID = try? container.decodeIfPresent(Double.self, forKey: .id) {
+            if doubleID.rounded() == doubleID {
+                id = String(Int64(doubleID))
+            } else {
+                throw DecodingError.typeMismatch(
+                    String.self,
+                    DecodingError.Context(
+                        codingPath: container.codingPath + [CodingKeys.id],
+                        debugDescription: "Expected Discord interaction data id to be a string or whole number."
+                    )
+                )
+            }
+        } else {
+            id = nil
+        }
+
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        custom_id = try container.decodeIfPresent(String.self, forKey: .custom_id)
+        component_type = try container.decodeIfPresent(Int.self, forKey: .component_type)
+        options = try container.decodeIfPresent([DiscordInteractionOption].self, forKey: .options)
+        components = try container.decodeIfPresent([DiscordComponent].self, forKey: .components)
+    }
 }
 
 struct DiscordInteractionOption: Codable, Sendable {

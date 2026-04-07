@@ -41,4 +41,29 @@ struct DiscordModelsTests {
         #expect(interaction.data?.custom_id == "this-is-iconic:trigger-modal")
         #expect(interaction.data?.components?.first?.components?.first?.value == "fizze time")
     }
+
+    @Test
+    func interactionDataIDDecodesWhenDiscordSendsANumber() throws {
+        let data = """
+        {
+          "id": "interaction-1",
+          "application_id": "app-1",
+          "type": 2,
+          "token": "token-1",
+          "member": {
+            "roles": ["config-role"],
+            "permissions": "0"
+          },
+          "data": {
+            "id": 1487254261594325000,
+            "name": "this-is-iconic"
+          }
+        }
+        """.data(using: .utf8)!
+
+        let interaction = try JSONDecoder().decode(DiscordInteraction.self, from: data)
+
+        #expect(interaction.data?.id == "1487254261594325000")
+        #expect(interaction.data?.name == "this-is-iconic")
+    }
 }
