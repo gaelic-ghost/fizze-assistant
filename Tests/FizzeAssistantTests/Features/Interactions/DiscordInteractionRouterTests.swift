@@ -156,7 +156,7 @@ struct DiscordInteractionRouterTests {
     }
 
     @Test
-    func thisIsIconicCommandCanEditExistingTriggerThroughPrefilledContentModal() async throws {
+    func thisIsntIconicCommandCanEditExistingTriggerThroughPrefilledContentModal() async throws {
         let rootURL = try makeTemporaryTestDirectory()
         let stub = makeDiscordRESTClient { request in
             (
@@ -186,11 +186,8 @@ struct DiscordInteractionRouterTests {
         await router.handle(
             slashInteraction(
                 id: "interaction-edit-1",
-                name: "this-is-iconic",
-                memberRoles: ["config-role"],
-                options: [
-                    DiscordInteractionOption(name: "trigger", type: 3, value: .string("fizze time"), options: nil),
-                ]
+                name: "this-isn't-iconic",
+                memberRoles: ["config-role"]
             ),
             guildName: "Guild"
         )
@@ -199,13 +196,46 @@ struct DiscordInteractionRouterTests {
             InteractionCallbackPayload.self,
             from: try #require(stub.requests().last)
         )
-        let contentField = try #require(modalPayload.data?.components?.first?.components?.first)
-        #expect(contentField.value == "old sparkle https://example.com/old.png")
+        #expect(modalPayload.data?.custom_id == ThisIsntIconicWizard.triggerModalID)
 
         await router.handle(
             modalInteraction(
                 id: "interaction-edit-2",
-                customID: try #require(modalPayload.data?.custom_id),
+                customID: ThisIsntIconicWizard.triggerModalID,
+                memberRoles: ["config-role"],
+                fieldCustomID: ThisIsntIconicWizard.triggerFieldID,
+                value: "fizze time"
+            ),
+            guildName: "Guild"
+        )
+
+        let continuePayload = try decodeRequestBody(
+            InteractionCallbackPayload.self,
+            from: try #require(stub.requests().last)
+        )
+        #expect(continuePayload.data?.content?.contains("right now when someone says `fizze time`") == true)
+
+        await router.handle(
+            buttonInteraction(
+                id: "interaction-edit-3",
+                customID: try #require(continuePayload.data?.components?.first?.components?.first?.custom_id),
+                memberRoles: ["config-role"]
+            ),
+            guildName: "Guild"
+        )
+
+        let contentModalPayload = try decodeRequestBody(
+            InteractionCallbackPayload.self,
+            from: try #require(stub.requests().last)
+        )
+        let contentField = try #require(contentModalPayload.data?.components?.first?.components?.first)
+        #expect(contentField.value == "old sparkle https://example.com/old.png")
+        #expect(contentField.label == "What should be different this time?")
+
+        await router.handle(
+            modalInteraction(
+                id: "interaction-edit-4",
+                customID: try #require(contentModalPayload.data?.custom_id),
                 memberRoles: ["config-role"],
                 fieldCustomID: ThisIsIconicWizard.contentFieldID,
                 value: "new sparkle https://example.com/new.png"
