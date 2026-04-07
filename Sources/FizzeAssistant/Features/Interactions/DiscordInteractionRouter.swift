@@ -8,7 +8,6 @@ actor DiscordInteractionRouter {
     let configurationStore: ConfigurationStore
     let warningStore: WarningStore
     let logger: Logger
-    let iconicWizardState = IconicWizardStateStore()
 
     // MARK: Lifecycle
 

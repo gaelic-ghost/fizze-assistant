@@ -82,4 +82,71 @@ struct WarningStoreTests {
         )
         #expect(created.guild_id == "guild")
     }
+
+    @Test
+    func iconicWizardDraftPersistsAcrossStoreRecreation() async throws {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+
+        let firstStore = try WarningStore(path: databaseURL.path)
+        let sessionID = try await firstStore.saveIconicWizardDraft(trigger: "fizze time", userID: "user-1")
+
+        let restartedStore = try WarningStore(path: databaseURL.path)
+        let draft = try await restartedStore.iconicWizardDraft(sessionID: sessionID, userID: "user-1")
+
+        #expect(draft.trigger == "fizze time")
+        #expect(draft.user_id == "user-1")
+    }
+
+    @Test
+    func iconicWizardDraftRejectsDifferentUser() async throws {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+
+        let store = try WarningStore(path: databaseURL.path)
+        let sessionID = try await store.saveIconicWizardDraft(trigger: "fizze time", userID: "user-1")
+
+        let error = await #expect(throws: UserFacingError.self, performing: {
+            _ = try await store.iconicWizardDraft(sessionID: sessionID, userID: "user-2")
+        })
+        #expect(error?.localizedDescription.contains("only the person who started") == true)
+    }
+
+    @Test
+    func iconicWizardDraftIsPurgedAfterLifetimeExpires() async throws {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+
+        let store = try WarningStore(path: databaseURL.path)
+        let createdAt = Date(timeIntervalSince1970: 0)
+        let sessionID = try await store.saveIconicWizardDraft(trigger: "fizze time", userID: "user-1", now: createdAt)
+
+        let error = await #expect(throws: UserFacingError.self, performing: {
+            _ = try await store.iconicWizardDraft(
+                sessionID: sessionID,
+                userID: "user-1",
+                now: createdAt.addingTimeInterval((15 * 60) + 1)
+            )
+        })
+        #expect(error?.localizedDescription.contains("bot process restarted") == true)
+    }
+
+    @Test
+    func removeIconicWizardDraftDeletesPersistedDraft() async throws {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+
+        let store = try WarningStore(path: databaseURL.path)
+        let sessionID = try await store.saveIconicWizardDraft(trigger: "fizze time", userID: "user-1")
+
+        try await store.removeIconicWizardDraft(sessionID: sessionID)
+
+        await #expect(throws: UserFacingError.self, performing: {
+            _ = try await store.iconicWizardDraft(sessionID: sessionID, userID: "user-1")
+        })
+    }
 }

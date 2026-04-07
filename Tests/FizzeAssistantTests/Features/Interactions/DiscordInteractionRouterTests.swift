@@ -91,4 +91,67 @@ struct DiscordInteractionRouterTests {
         #expect(persisted.iconic_messages["fizze time"]?.embeds?.first?.description == "sparkle mode engaged https://example.com/iconic.png")
         #expect(persisted.iconic_messages["fizze time"]?.embeds?.first?.image?.url == "https://example.com/iconic.png")
     }
+
+    @Test
+    func thisIsIconicWizardSurvivesRouterRecreationBetweenSteps() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+        let firstRouter = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        await firstRouter.handle(
+            modalInteraction(
+                id: "interaction-restart-1",
+                customID: ThisIsIconicWizard.triggerModalID,
+                memberRoles: ["config-role"],
+                fieldCustomID: ThisIsIconicWizard.triggerFieldID,
+                value: "FIZZE RESTART"
+            ),
+            guildName: "Guild"
+        )
+
+        let continuePayload = try decodeRequestBody(
+            InteractionCallbackPayload.self,
+            from: try #require(stub.requests().last)
+        )
+        let continueButtonID = try #require(continuePayload.data?.components?.first?.components?.first?.custom_id)
+
+        let restartedRouter = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        await restartedRouter.handle(
+            buttonInteraction(
+                id: "interaction-restart-2",
+                customID: continueButtonID,
+                memberRoles: ["config-role"]
+            ),
+            guildName: "Guild"
+        )
+
+        let contentModalPayload = try decodeRequestBody(
+            InteractionCallbackPayload.self,
+            from: try #require(stub.requests().last)
+        )
+        let contentModalID = try #require(contentModalPayload.data?.custom_id)
+
+        await restartedRouter.handle(
+            modalInteraction(
+                id: "interaction-restart-3",
+                customID: contentModalID,
+                memberRoles: ["config-role"],
+                fieldCustomID: ThisIsIconicWizard.contentFieldID,
+                value: "restart-safe sparkle"
+            ),
+            guildName: "Guild"
+        )
+
+        let persisted = try JSONDecoder().decode(
+            BotConfigurationFile.self,
+            from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant.json"))
+        )
+        #expect(persisted.iconic_messages["fizze restart"]?.embeds?.first?.description == "restart-safe sparkle")
+    }
 }

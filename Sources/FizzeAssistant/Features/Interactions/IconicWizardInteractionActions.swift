@@ -34,7 +34,7 @@ extension DiscordInteractionRouter {
         try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
         let sessionID = String(customID.dropFirst(ThisIsIconicWizard.continueButtonPrefix.count))
         let userID = try requireInteractionUserID(interaction, context: "this-is-iconic continue button")
-        _ = try await iconicWizardState.draft(sessionID: sessionID, userID: userID)
+        _ = try await warningStore.iconicWizardDraft(sessionID: sessionID, userID: userID)
         try await respondWithModal(
             to: interaction,
             customID: ThisIsIconicWizard.contentModalPrefix + sessionID,
@@ -70,7 +70,7 @@ extension DiscordInteractionRouter {
                 interactionName: "this-is-iconic trigger step"
             )
             let normalizedTrigger = try IconicMessageConfiguration.normalizedTrigger(submittedTrigger)
-            let sessionID = await iconicWizardState.save(trigger: normalizedTrigger, userID: userID)
+            let sessionID = try await warningStore.saveIconicWizardDraft(trigger: normalizedTrigger, userID: userID)
 
             try await respond(
                 to: interaction,
@@ -89,7 +89,7 @@ extension DiscordInteractionRouter {
 
         case let modalID where modalID.hasPrefix(ThisIsIconicWizard.contentModalPrefix):
             let sessionID = String(modalID.dropFirst(ThisIsIconicWizard.contentModalPrefix.count))
-            let draft = try await iconicWizardState.draft(sessionID: sessionID, userID: userID)
+            let draft = try await warningStore.iconicWizardDraft(sessionID: sessionID, userID: userID)
             let submittedContent = try requireComponentValue(
                 customID: ThisIsIconicWizard.contentFieldID,
                 from: data.components,
@@ -97,7 +97,7 @@ extension DiscordInteractionRouter {
             )
             let iconicMessage = try iconicMessageConfiguration(fromWizardContent: submittedContent)
             _ = try await configurationStore.saveIconicMessage(trigger: draft.trigger, message: iconicMessage)
-            await iconicWizardState.remove(sessionID: sessionID)
+            try await warningStore.removeIconicWizardDraft(sessionID: sessionID)
             try await respond(to: interaction, content: ThisIsIconicWizard.successMessage, ephemeral: true)
 
         default:
