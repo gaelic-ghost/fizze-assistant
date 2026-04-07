@@ -128,7 +128,7 @@ For richer iconic messages, `/this-is-iconic` walks through a two-step Discord-n
 1. It asks for the trigger text and normalizes it before saving.
 2. It asks for the iconic content text, keeps that text verbatim as embed description, and uses the first URL in the text as the embed image when one is present.
 
-The resulting iconic message is saved under `iconic_messages` in the active JSON config file, keyed by normalized trigger text. With the default local-override flow, that means `fizze-assistant-local.json` once you create it. Hand-editing the active JSON is still the escape hatch for any richer embed payloads you want to author manually.
+The resulting iconic message is saved under `iconic_messages` in the active local JSON config file, keyed by normalized trigger text. The runtime now treats `fizze-assistant.json` as a committed baseline template only: if `fizze-assistant-local.json` is missing, startup seeds it from the baseline and then uses only the local file for future edits. Hand-editing the active local JSON is still the escape hatch for any richer embed payloads you want to author manually.
 
 Only the dedicated config-owner roles may use `/config`. Normal staff roles can still use the moderation and `/say` commands, but they cannot change bot configuration.
 

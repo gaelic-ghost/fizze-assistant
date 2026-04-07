@@ -85,7 +85,7 @@ struct DiscordInteractionRouterTests {
 
         let persisted = try JSONDecoder().decode(
             BotConfigurationFile.self,
-            from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant.json"))
+            from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant-local.json"))
         )
         #expect(persisted.iconic_messages["fizze time"]?.content == nil)
         #expect(persisted.iconic_messages["fizze time"]?.embeds?.first?.description == "sparkle mode engaged https://example.com/iconic.png")
@@ -150,7 +150,7 @@ struct DiscordInteractionRouterTests {
 
         let persisted = try JSONDecoder().decode(
             BotConfigurationFile.self,
-            from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant.json"))
+            from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant-local.json"))
         )
         #expect(persisted.iconic_messages["fizze restart"]?.embeds?.first?.description == "restart-safe sparkle")
     }

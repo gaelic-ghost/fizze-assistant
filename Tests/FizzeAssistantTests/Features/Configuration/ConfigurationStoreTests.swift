@@ -2,6 +2,14 @@ import Foundation
 import Testing
 @testable import FizzeAssistant
 
+private final class TestDateSource: @unchecked Sendable {
+    var current: Date
+
+    init(current: Date) {
+        self.current = current
+    }
+}
+
 struct ConfigurationStoreTests {
     // MARK: Tests
 
@@ -32,9 +40,10 @@ struct ConfigurationStoreTests {
     }
 
     @Test
-    func defaultLoaderFallsBackToTrackedBaselineWhenLocalOverrideIsMissing() async throws {
+    func defaultLoaderSeedsLocalConfigurationFromBaselineWhenLocalOverrideIsMissing() async throws {
         let rootURL = try makeTemporaryRootURL()
         let baselineURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        let localURL = rootURL.appendingPathComponent("fizze-assistant-local.json")
         try writeConfiguration(
             makeConfiguration(rootURL: rootURL, applicationID: "baseline-app"),
             to: baselineURL
@@ -48,7 +57,10 @@ struct ConfigurationStoreTests {
 
         #expect(runtime.application_id == "baseline-app")
         let resolvedURL = await store.configurationURL()
-        #expect(resolvedURL.lastPathComponent == "fizze-assistant.json")
+        #expect(resolvedURL.lastPathComponent == "fizze-assistant-local.json")
+        #expect(FileManager.default.fileExists(atPath: localURL.path))
+        let localRuntime = try JSONDecoder().decode(BotConfigurationFile.self, from: Data(contentsOf: localURL))
+        #expect(localRuntime.application_id == "baseline-app")
     }
 
     @Test
@@ -59,7 +71,7 @@ struct ConfigurationStoreTests {
             from: nil,
             environment: ["DISCORD_BOT_TOKEN": "token", "PWD": rootURL.path]
         )
-        let configurationURL = try await store.initializeConfigurationFileIfNeeded()
+        let configurationURL = await store.configurationURL()
 
         #expect(configurationURL.lastPathComponent == "fizze-assistant-local.json")
         #expect(FileManager.default.fileExists(atPath: configurationURL.path))
@@ -82,12 +94,19 @@ struct ConfigurationStoreTests {
         _ = try await store.update(setting: .trigger_matching_mode, value: "fuzze")
         _ = try await store.addTrigger(trigger: "FIZZE TIME", response: "sparkle")
 
-        let data = try Data(contentsOf: configURL)
+        let localURL = rootURL.appendingPathComponent("fizze-assistant-local.json")
+        let data = try Data(contentsOf: localURL)
         let runtime = try JSONDecoder().decode(BotConfigurationFile.self, from: data)
         #expect(runtime.welcome_channel_id == "123456")
         #expect(runtime.suggestions_channel_id == "654321")
         #expect(runtime.trigger_matching_mode == .fuzze)
         #expect(runtime.iconic_messages["fizze time"]?.content == "sparkle")
+
+        let baselineRuntime = try JSONDecoder().decode(BotConfigurationFile.self, from: Data(contentsOf: configURL))
+        #expect(baselineRuntime.welcome_channel_id == nil)
+        #expect(baselineRuntime.suggestions_channel_id == nil)
+        #expect(baselineRuntime.trigger_matching_mode == .exact)
+        #expect(baselineRuntime.iconic_messages["fizze time"] == nil)
     }
 
     @Test
@@ -116,6 +135,55 @@ struct ConfigurationStoreTests {
 
         #expect(localRuntime.welcome_channel_id == "123456")
         #expect(baselineRuntime.welcome_channel_id == nil)
+    }
+
+    @Test
+    func explicitBaselinePathRedirectsToLocalOverride() async throws {
+        let rootURL = try makeTemporaryRootURL()
+        let baselineURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfiguration(
+            makeConfiguration(rootURL: rootURL, applicationID: "baseline-app"),
+            to: baselineURL
+        )
+
+        let store = try ConfigurationStore.load(
+            from: baselineURL,
+            environment: ["DISCORD_BOT_TOKEN": "token"]
+        )
+
+        let resolvedURL = await store.configurationURL()
+        #expect(resolvedURL.lastPathComponent == "fizze-assistant-local.json")
+        let runtime = await store.configurationFileContents()
+        #expect(runtime.application_id == "baseline-app")
+    }
+
+    @Test
+    func runtimeUpdatesCreateOneHourlyBackupForLocalConfig() async throws {
+        let rootURL = try makeTemporaryRootURL()
+        let localURL = rootURL.appendingPathComponent("fizze-assistant-local.json")
+        try writeConfiguration(makeConfiguration(rootURL: rootURL), to: localURL)
+
+        let dateSource = TestDateSource(current: Date(timeIntervalSince1970: 1_700_000_000))
+        let store = ConfigurationStore(
+            botToken: "token",
+            configURL: localURL,
+            baselineTemplateURL: nil,
+            configurationFile: makeConfiguration(rootURL: rootURL),
+            now: { dateSource.current }
+        )
+
+        _ = try await store.update(setting: .welcome_channel_id, value: "123456")
+        _ = try await store.update(setting: .leave_channel_id, value: "654321")
+
+        let backupDirectoryURL = rootURL.appendingPathComponent(".data/config-backups", isDirectory: true)
+        let firstHourFiles = try FileManager.default.contentsOfDirectory(atPath: backupDirectoryURL.path)
+        #expect(firstHourFiles.count == 1)
+
+        dateSource.current = dateSource.current.addingTimeInterval(3600)
+        _ = try await store.update(setting: .mod_log_channel_id, value: "mod-log")
+
+        let secondHourFiles = try FileManager.default.contentsOfDirectory(atPath: backupDirectoryURL.path)
+        #expect(secondHourFiles.count == 2)
     }
 
     @Test

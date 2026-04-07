@@ -5,37 +5,60 @@ actor ConfigurationStore {
 
     static let baselineConfigurationFileName = "fizze-assistant.json"
     static let localConfigurationFileName = "fizze-assistant-local.json"
+    static let localBackupDirectoryName = "config-backups"
 
     // MARK: Stored Properties
 
     private let botToken: String
     private let configURL: URL
+    private let baselineTemplateURL: URL?
     private var configurationFile: BotConfigurationFile
+    private let now: @Sendable () -> Date
 
     // MARK: Lifecycle
 
-    init(botToken: String, configURL: URL, configurationFile: BotConfigurationFile) {
+    init(
+        botToken: String,
+        configURL: URL,
+        baselineTemplateURL: URL?,
+        configurationFile: BotConfigurationFile,
+        now: @escaping @Sendable () -> Date = Date.init
+    ) {
         self.botToken = botToken
         self.configURL = configURL
+        self.baselineTemplateURL = baselineTemplateURL
         self.configurationFile = configurationFile
+        self.now = now
     }
 
     // MARK: Loading
 
     static func load(from localConfigURL: URL?, environment: [String: String]) throws -> ConfigurationStore {
         let botToken = environment["DISCORD_BOT_TOKEN"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let configURL = localConfigURL ?? defaultConfigURL(environment: environment, fileManager: .default)
-
-        let configurationFile: BotConfigurationFile
-        if FileManager.default.fileExists(atPath: configURL.path) {
-            let data = try Data(contentsOf: configURL)
-            let decoder = JSONDecoder()
-            configurationFile = try decoder.decode(BotConfigurationFile.self, from: data)
-        } else {
-            configurationFile = .defaults
+        let resolution = try resolveConfiguration(
+            from: localConfigURL,
+            environment: environment,
+            fileManager: .default
+        )
+        if !FileManager.default.fileExists(atPath: resolution.activeURL.path) {
+            if let baselineTemplateURL = resolution.baselineTemplateURL {
+                try seedLocalConfigurationIfNeeded(from: baselineTemplateURL, to: resolution.activeURL, fileManager: .default)
+            } else if resolution.activeURL.lastPathComponent == localConfigurationFileName {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let directoryURL = resolution.activeURL.deletingLastPathComponent()
+                try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+                try encoder.encode(BotConfigurationFile.defaults).write(to: resolution.activeURL)
+            }
         }
+        let configurationFile = try loadConfigurationFile(from: resolution.activeURL)
 
-        return ConfigurationStore(botToken: botToken, configURL: configURL, configurationFile: configurationFile)
+        return ConfigurationStore(
+            botToken: botToken,
+            configURL: resolution.activeURL,
+            baselineTemplateURL: resolution.baselineTemplateURL,
+            configurationFile: configurationFile
+        )
     }
 
     // MARK: Accessors
@@ -65,6 +88,16 @@ actor ConfigurationStore {
     func initializeConfigurationFileIfNeeded() throws -> URL {
         if FileManager.default.fileExists(atPath: configURL.path) {
             return configURL
+        }
+
+        if let baselineTemplateURL {
+            try Self.seedLocalConfigurationIfNeeded(from: baselineTemplateURL, to: configURL, fileManager: .default)
+            if FileManager.default.fileExists(atPath: configURL.path) {
+                let data = try Data(contentsOf: configURL)
+                let decoder = JSONDecoder()
+                configurationFile = try decoder.decode(BotConfigurationFile.self, from: data)
+                return configURL
+            }
         }
 
         try persist(configurationFile: configurationFile)
@@ -161,23 +194,76 @@ actor ConfigurationStore {
 
     // MARK: Private Helpers
 
-    private static func defaultConfigURL(environment: [String: String], fileManager: FileManager) -> URL {
+    private static func resolveConfiguration(
+        from explicitConfigURL: URL?,
+        environment: [String: String],
+        fileManager: FileManager
+    ) throws -> (activeURL: URL, baselineTemplateURL: URL?) {
+        if let explicitConfigURL {
+            return try resolveExplicitConfiguration(explicitConfigURL, fileManager: fileManager)
+        }
+
+        let rootURL = rootURL(environment: environment, fileManager: fileManager)
+        let localURL = rootURL.appendingPathComponent(localConfigurationFileName)
+        let baselineURL = rootURL.appendingPathComponent(baselineConfigurationFileName)
+
+        if fileManager.fileExists(atPath: localURL.path) {
+            return (activeURL: localURL, baselineTemplateURL: fileManager.fileExists(atPath: baselineURL.path) ? baselineURL : nil)
+        }
+
+        if fileManager.fileExists(atPath: baselineURL.path) {
+            try seedLocalConfigurationIfNeeded(from: baselineURL, to: localURL, fileManager: fileManager)
+            return (activeURL: localURL, baselineTemplateURL: baselineURL)
+        }
+
+        return (activeURL: localURL, baselineTemplateURL: nil)
+    }
+
+    private static func resolveExplicitConfiguration(_ explicitConfigURL: URL, fileManager: FileManager) throws -> (activeURL: URL, baselineTemplateURL: URL?) {
+        let explicitName = explicitConfigURL.lastPathComponent
+        if explicitName == localConfigurationFileName {
+            let baselineURL = explicitConfigURL.deletingLastPathComponent().appendingPathComponent(baselineConfigurationFileName)
+            return (activeURL: explicitConfigURL, baselineTemplateURL: fileManager.fileExists(atPath: baselineURL.path) ? baselineURL : nil)
+        }
+
+        if explicitName == baselineConfigurationFileName {
+            let localURL = explicitConfigURL.deletingLastPathComponent().appendingPathComponent(localConfigurationFileName)
+            try seedLocalConfigurationIfNeeded(from: explicitConfigURL, to: localURL, fileManager: fileManager)
+            return (activeURL: localURL, baselineTemplateURL: explicitConfigURL)
+        }
+
+        return (activeURL: explicitConfigURL, baselineTemplateURL: nil)
+    }
+
+    private static func rootURL(environment: [String: String], fileManager: FileManager) -> URL {
         let configuredWorkingDirectory = environment["PWD"]?.trimmingCharacters(in: .whitespacesAndNewlines)
         let workingDirectoryPath = configuredWorkingDirectory?.isEmpty == false
             ? configuredWorkingDirectory!
             : fileManager.currentDirectoryPath
-        let rootURL = URL(fileURLWithPath: workingDirectoryPath, isDirectory: true)
-        let localURL = rootURL.appendingPathComponent(localConfigurationFileName)
-        if fileManager.fileExists(atPath: localURL.path) {
-            return localURL
+        return URL(fileURLWithPath: workingDirectoryPath, isDirectory: true)
+    }
+
+    private static func loadConfigurationFile(from configURL: URL) throws -> BotConfigurationFile {
+        if FileManager.default.fileExists(atPath: configURL.path) {
+            let data = try Data(contentsOf: configURL)
+            let decoder = JSONDecoder()
+            return try decoder.decode(BotConfigurationFile.self, from: data)
         }
 
-        let baselineURL = rootURL.appendingPathComponent(baselineConfigurationFileName)
-        if fileManager.fileExists(atPath: baselineURL.path) {
-            return baselineURL
+        return .defaults
+    }
+
+    private static func seedLocalConfigurationIfNeeded(from baselineURL: URL, to localURL: URL, fileManager: FileManager) throws {
+        guard !fileManager.fileExists(atPath: localURL.path) else {
+            return
         }
 
-        return localURL
+        guard fileManager.fileExists(atPath: baselineURL.path) else {
+            return
+        }
+
+        try fileManager.createDirectory(at: localURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileManager.copyItem(at: baselineURL, to: localURL)
     }
 
     private func persist(configurationFile: BotConfigurationFile) throws {
@@ -188,6 +274,8 @@ actor ConfigurationStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(configurationFile)
 
+        try maybeCreateHourlyBackup(fileManager: .default, now: now())
+
         let temporaryURL = directoryURL.appendingPathComponent(UUID().uuidString).appendingPathExtension("tmp")
         try data.write(to: temporaryURL, options: .atomic)
 
@@ -195,6 +283,38 @@ actor ConfigurationStore {
             try FileManager.default.removeItem(at: configURL)
         }
         try FileManager.default.moveItem(at: temporaryURL, to: configURL)
+    }
+
+    private func maybeCreateHourlyBackup(fileManager: FileManager, now: Date) throws {
+        guard configURL.lastPathComponent == Self.localConfigurationFileName else {
+            return
+        }
+
+        guard fileManager.fileExists(atPath: configURL.path) else {
+            return
+        }
+
+        let backupDirectoryURL = configURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".data", isDirectory: true)
+            .appendingPathComponent(Self.localBackupDirectoryName, isDirectory: true)
+        try fileManager.createDirectory(at: backupDirectoryURL, withIntermediateDirectories: true)
+
+        let backupURL = backupDirectoryURL.appendingPathComponent(hourlyBackupFileName(now: now))
+        guard !fileManager.fileExists(atPath: backupURL.path) else {
+            return
+        }
+
+        try fileManager.copyItem(at: configURL, to: backupURL)
+    }
+
+    private func hourlyBackupFileName(now: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd-HH"
+        return "fizze-assistant-local-\(formatter.string(from: now)).json"
     }
 
     private func normalizedRequiredString(_ value: String, name: String) throws -> String {

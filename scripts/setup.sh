@@ -4,7 +4,7 @@ set -eu
 
 REPO_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 ENV_FILE="${ENV_FILE:-$REPO_DIR/.env.local}"
-CONFIG_FILE="${CONFIG_FILE:-$REPO_DIR/fizze-assistant.json}"
+CONFIG_FILE="${CONFIG_FILE:-$REPO_DIR/fizze-assistant-local.json}"
 BINARY_PATH="${BINARY_PATH:-$REPO_DIR/.build/release/fizze-assistant}"
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -18,12 +18,6 @@ fi
 
 if [ -z "${DISCORD_BOT_TOKEN:-}" ]; then
   echo "DISCORD_BOT_TOKEN is not set after loading $ENV_FILE" >&2
-  exit 1
-fi
-
-if [ ! -f "$CONFIG_FILE" ]; then
-  echo "Missing configuration file: $CONFIG_FILE" >&2
-  echo "Expected the committed non-secret config file at fizze-assistant.json." >&2
   exit 1
 fi
 
