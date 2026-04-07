@@ -193,7 +193,7 @@ extension DiscordInteractionRouter {
             components: [
                 shortInputRow(
                     customID: ThisIsIconicWizard.triggerFieldID,
-                    label: "What trigger text should wake up this iconic moment?",
+                    label: "What trigger should start this iconic moment?",
                     placeholder: "Type the trigger text here."
                 ),
             ]

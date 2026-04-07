@@ -22,6 +22,13 @@ struct IconicWizardInteractionActionsTests {
     }
 
     @Test
+    func firstStepModalLabelFitsDiscordLimit() {
+        let label = "What trigger should start this iconic moment?"
+        #expect(label.count <= 45)
+        #expect(!label.isEmpty)
+    }
+
+    @Test
     func secondStepModalLabelFitsDiscordLimit() {
         #expect(ThisIsIconicWizard.contentFieldLabel.count <= 45)
         #expect(!ThisIsIconicWizard.contentFieldLabel.isEmpty)
