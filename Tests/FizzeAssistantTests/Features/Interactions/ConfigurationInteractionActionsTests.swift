@@ -42,7 +42,7 @@ struct ConfigurationInteractionActionsTests {
 
         let persisted = try JSONDecoder().decode(
             BotConfigurationFile.self,
-            from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant.json"))
+            from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant-local.json"))
         )
         #expect(persisted.trigger_matching_mode == .fuzze)
     }

@@ -105,7 +105,16 @@ extension DiscordInteractionRouter {
         }
     }
 
-    func startThisIsIconicWizard(_ interaction: DiscordInteraction) async throws {
+    func startThisIsIconicWizard(
+        _ interaction: DiscordInteraction,
+        data: DiscordInteractionData,
+        configuration: AppConfiguration
+    ) async throws {
+        if let trigger = data.options?.first(where: { $0.name == "trigger" })?.value?.stringValue {
+            try await startThisIsIconicEditWizard(interaction, trigger: trigger, configuration: configuration)
+            return
+        }
+
         try await respondWithModal(
             to: interaction,
             customID: ThisIsIconicWizard.triggerModalID,
@@ -115,6 +124,36 @@ extension DiscordInteractionRouter {
                     customID: ThisIsIconicWizard.triggerFieldID,
                     label: "What trigger text should wake up this iconic moment?",
                     placeholder: "Type the trigger text here."
+                ),
+            ]
+        )
+    }
+
+    func startThisIsIconicEditWizard(
+        _ interaction: DiscordInteraction,
+        trigger: String,
+        configuration: AppConfiguration
+    ) async throws {
+        let normalizedTrigger = try IconicMessageConfiguration.normalizedTrigger(trigger)
+        guard let existingMessage = configuration.iconic_messages[normalizedTrigger] else {
+            throw UserFacingError("DiscordInteractionRouter.startThisIsIconicEditWizard: `/this-is-iconic` could not find an existing iconic trigger named `\(normalizedTrigger)` to edit. The most likely cause is a typo in the trigger text or that the iconic response has not been created yet.")
+        }
+
+        let editableContent = try editableWizardContent(from: existingMessage, trigger: normalizedTrigger)
+        let userID = try requireInteractionUserID(interaction, context: "this-is-iconic edit command")
+        let sessionID = try await warningStore.saveIconicWizardDraft(trigger: normalizedTrigger, userID: userID)
+
+        try await respondWithModal(
+            to: interaction,
+            customID: ThisIsIconicWizard.contentModalPrefix + sessionID,
+            title: "Edit This Is Iconic",
+            components: [
+                paragraphInputRow(
+                    customID: ThisIsIconicWizard.contentFieldID,
+                    label: ThisIsIconicWizard.contentFieldLabel,
+                    placeholder: ThisIsIconicWizard.contentFieldPlaceholder,
+                    value: editableContent,
+                    maxLength: 4_000
                 ),
             ]
         )
@@ -152,6 +191,29 @@ extension DiscordInteractionRouter {
                 return match.url
             }
             .first
+    }
+
+    func editableWizardContent(from message: IconicMessageConfiguration, trigger: String) throws -> String {
+        if let content = message.content, message.embeds == nil {
+            return content
+        }
+
+        if
+            message.content == nil,
+            let embeds = message.embeds,
+            embeds.count == 1,
+            let embed = embeds.first,
+            embed.title == nil,
+            embed.type == nil,
+            embed.url == nil,
+            embed.color == nil,
+            embed.footer == nil,
+            let description = embed.description
+        {
+            return description
+        }
+
+        throw UserFacingError("DiscordInteractionRouter.editableWizardContent: iconic trigger `\(trigger)` uses a richer payload than the current `/this-is-iconic` editor can round-trip safely. The most likely cause is a hand-authored config entry with extra embed fields or mixed text-plus-embed content; edit that entry directly in `fizze-assistant-local.json` instead.")
     }
 
     // MARK: Private Helpers
@@ -197,7 +259,7 @@ extension DiscordInteractionRouter {
         )
     }
 
-    private func paragraphInputRow(customID: String, label: String, placeholder: String, maxLength: Int) -> DiscordComponent {
+    private func paragraphInputRow(customID: String, label: String, placeholder: String, value: String? = nil, maxLength: Int) -> DiscordComponent {
         DiscordComponent(
             type: DiscordComponentType.actionRow,
             components: [
@@ -209,7 +271,7 @@ extension DiscordInteractionRouter {
                     label: label,
                     title: nil,
                     description: nil,
-                    value: nil,
+                    value: value,
                     url: nil,
                     placeholder: placeholder,
                     required: true,

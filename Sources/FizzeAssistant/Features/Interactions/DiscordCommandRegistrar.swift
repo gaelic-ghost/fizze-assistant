@@ -106,7 +106,15 @@ struct DiscordCommandRegistrar {
             DiscordSlashCommand(
                 name: "this-is-iconic",
                 description: "Walk through a new iconic response in two quick steps.",
-                options: nil
+                options: [
+                    DiscordApplicationCommandOption(
+                        type: 3,
+                        name: "trigger",
+                        description: "Existing trigger to edit instead of creating a new one.",
+                        required: false,
+                        channel_types: nil
+                    ),
+                ]
             ),
         ]
     }

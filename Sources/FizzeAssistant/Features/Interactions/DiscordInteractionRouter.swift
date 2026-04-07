@@ -74,7 +74,7 @@ actor DiscordInteractionRouter {
 
         case "this-is-iconic":
             try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
-            try await startThisIsIconicWizard(interaction)
+            try await startThisIsIconicWizard(interaction, data: data, configuration: configuration)
 
         default:
             try await respond(to: interaction, content: "That command isn't implemented yet.", ephemeral: true)

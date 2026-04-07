@@ -27,6 +27,43 @@ struct IconicWizardInteractionActionsTests {
         #expect(!ThisIsIconicWizard.contentFieldLabel.isEmpty)
     }
 
+    @Test
+    func editableWizardContentSupportsTextOnlyReplies() async throws {
+        let router = try await makeRouter()
+
+        let content = try await router.editableWizardContent(
+            from: IconicMessageConfiguration(content: "sparkle mode engaged", embeds: nil),
+            trigger: "fizze time"
+        )
+        #expect(content == "sparkle mode engaged")
+    }
+
+    @Test
+    func editableWizardContentRejectsMixedTextAndEmbeds() async throws {
+        let router = try await makeRouter()
+
+        let error = await #expect(throws: UserFacingError.self, performing: {
+            _ = try await router.editableWizardContent(
+                from: IconicMessageConfiguration(
+                    content: "sparkle mode engaged",
+                    embeds: [
+                        DiscordEmbed(
+                            title: nil,
+                            type: nil,
+                            description: "sparkle mode engaged",
+                            url: nil,
+                            color: nil,
+                            footer: nil,
+                            image: nil
+                        ),
+                    ]
+                ),
+                trigger: "fizze time"
+            )
+        })
+        #expect(error?.localizedDescription.contains("richer payload") == true)
+    }
+
     // MARK: Helpers
 
     private func makeRouter() async throws -> DiscordInteractionRouter {

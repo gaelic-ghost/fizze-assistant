@@ -154,4 +154,70 @@ struct DiscordInteractionRouterTests {
         )
         #expect(persisted.iconic_messages["fizze restart"]?.embeds?.first?.description == "restart-safe sparkle")
     }
+
+    @Test
+    func thisIsIconicCommandCanEditExistingTriggerThroughPrefilledContentModal() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+        let router = try await makeRouter(rootURL: rootURL, restClient: stub.client) { configuration in
+            configuration.iconic_messages = [
+                "fizze time": IconicMessageConfiguration(
+                    content: nil,
+                    embeds: [
+                        DiscordEmbed(
+                            title: nil,
+                            type: nil,
+                            description: "old sparkle https://example.com/old.png",
+                            url: nil,
+                            color: nil,
+                            footer: nil,
+                            image: DiscordEmbedImage(url: "https://example.com/old.png", height: nil, width: nil)
+                        ),
+                    ]
+                ),
+            ]
+        }
+
+        await router.handle(
+            slashInteraction(
+                id: "interaction-edit-1",
+                name: "this-is-iconic",
+                memberRoles: ["config-role"],
+                options: [
+                    DiscordInteractionOption(name: "trigger", type: 3, value: .string("fizze time"), options: nil),
+                ]
+            ),
+            guildName: "Guild"
+        )
+
+        let modalPayload = try decodeRequestBody(
+            InteractionCallbackPayload.self,
+            from: try #require(stub.requests().last)
+        )
+        let contentField = try #require(modalPayload.data?.components?.first?.components?.first)
+        #expect(contentField.value == "old sparkle https://example.com/old.png")
+
+        await router.handle(
+            modalInteraction(
+                id: "interaction-edit-2",
+                customID: try #require(modalPayload.data?.custom_id),
+                memberRoles: ["config-role"],
+                fieldCustomID: ThisIsIconicWizard.contentFieldID,
+                value: "new sparkle https://example.com/new.png"
+            ),
+            guildName: "Guild"
+        )
+
+        let persisted = try JSONDecoder().decode(
+            BotConfigurationFile.self,
+            from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant-local.json"))
+        )
+        #expect(persisted.iconic_messages["fizze time"]?.embeds?.first?.description == "new sparkle https://example.com/new.png")
+        #expect(persisted.iconic_messages["fizze time"]?.embeds?.first?.image?.url == "https://example.com/new.png")
+    }
 }

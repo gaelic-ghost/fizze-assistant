@@ -24,6 +24,9 @@ struct DiscordCommandRegistrarTests {
         #expect(subcommandNames.contains("trigger-add"))
         #expect(subcommandNames.contains("trigger-list"))
 
+        let iconicCommand = registrar.guildCommands.first(where: { $0.name == "this-is-iconic" })
+        #expect(iconicCommand?.options?.first?.name == "trigger")
+
         let arrestCommand = registrar.guildCommands.first(where: { $0.name == "arrest" })
         #expect(arrestCommand?.options?.first?.name == "user")
 
