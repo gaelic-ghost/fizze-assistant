@@ -175,9 +175,9 @@ Batch planning before the priority list:
 
 - [ ] Batch 0: fix or quarantine the unrelated `BotApplicationTests.configInitCreatesConfigurationFile` failure before broadening the suite further, so package-wide runs stay trustworthy while adding coverage.
 - [x] Batch 1: extend `DiscordInteractionRouterTests` and the existing interaction fixtures first, because the highest-priority roadmap gaps all sit on top of that harness and can share setup work.
-- [ ] Batch 2: add Discord command-registration and payload-shape guardrails next, using parameterized tests where possible so field-length and numeric-or-string wire-shape cases stay compact.
-- [ ] Batch 3: deepen Gateway and `FizzeBot` resilience coverage only after the decode and registration guardrails are in place, so those tests focus on survival behavior rather than basic payload validation.
-- [ ] Batch 4: add the broader iconic create/edit confidence tests last, once the unhappy-path and payload-boundary behavior is already locked in.
+- [x] Batch 2: add Discord command-registration and payload-shape guardrails next, using parameterized tests where possible so field-length and numeric-or-string wire-shape cases stay compact.
+- [x] Batch 3: deepen Gateway and `FizzeBot` resilience coverage only after the decode and registration guardrails are in place, so those tests focus on survival behavior rather than basic payload validation.
+- [x] Batch 4: add the broader iconic create/edit confidence tests last, once the unhappy-path and payload-boundary behavior is already locked in.
 
 Batch 0 implementation checklist:
 
@@ -231,11 +231,11 @@ Priority 3: Gateway resilience and bot-level survival
 
 Priority 4: End-to-end user-flow confidence for iconic commands
 
-- [ ] Add a create-flow test that covers plain text content without a URL, and assert the saved config shape matches the intended product behavior for text-only iconic replies.
-- [ ] Add an edit-flow test that rewrites only the message content while preserving the same trigger key, and assert that the flow behaves like editing content rather than replacing identity.
-- [ ] Add a full create-flow snapshot-style test that asserts the first modal, continue prompt, second modal, and final persisted config together, so the whole authoring contract is documented in one place.
-- [ ] Add a full edit-flow snapshot-style test that asserts the trigger prompt, current-content summary, prefilled content modal, and final persisted config together.
-- [ ] Add a test that verifies both iconic command flows remain within Discord field-length limits for labels, titles, button text, placeholders, and any summary text that is constrained by component rules.
+- [x] Add a create-flow test that covers plain text content without a URL, and assert the saved config shape matches the intended product behavior for text-only iconic replies.
+- [x] Add an edit-flow test that rewrites only the message content while preserving the same trigger key, and assert that the flow behaves like editing content rather than replacing identity.
+- [x] Add a full create-flow snapshot-style test that asserts the first modal, continue prompt, second modal, and final persisted config together, so the whole authoring contract is documented in one place.
+- [x] Add a full edit-flow snapshot-style test that asserts the trigger prompt, current-content summary, prefilled content modal, and final persisted config together.
+- [x] Add a test that verifies both iconic command flows remain within Discord field-length limits for labels, titles, button text, placeholders, and any summary text that is constrained by component rules.
 
 Execution order:
 
