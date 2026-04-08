@@ -101,7 +101,13 @@ struct DiscordGatewayClientTests {
             return requested.count == 2
         }
 
+        let requestedURLs = factory.requestedURLs
+        #expect(requestedURLs[0].absoluteString == "wss://gateway.discord.gg?v=10&encoding=json")
+        #expect(requestedURLs[1].absoluteString == "wss://gateway.discord.gg?v=10&encoding=json")
+
+        let firstPayloads = try await firstSocket.sentPayloadObjects()
         let secondPayloads = try await secondSocket.sentPayloadObjects()
+        #expect(gatewayOpcode(firstPayloads.first?["op"]) == DiscordGatewayOpCode.identify)
         #expect(gatewayOpcode(secondPayloads.first?["op"]) == DiscordGatewayOpCode.identify)
 
         await client.stop()
@@ -246,6 +252,66 @@ struct DiscordGatewayClientTests {
         #expect(message.id == "message-1")
         #expect(message.content == "fizze")
         #expect(factory.requestedURLs.count == 1)
+
+        await client.stop()
+    }
+
+    @Test
+    func toleratedBadDispatchStillUsesResumeOnLaterReconnect() async throws {
+        let firstSocket = StubDiscordGatewaySocket(receiveSteps: [
+            .message(gatewayMessage("""
+            {"op":10,"d":{"heartbeat_interval":60000},"s":null,"t":null}
+            """)),
+            .message(gatewayMessage("""
+            {"op":0,"d":{"session_id":"session-123","resume_gateway_url":"wss://gateway.resume.discord.gg"},"s":1,"t":"READY"}
+            """)),
+            .message(gatewayMessage("""
+            {"op":0,"d":{"id":"interaction-1","application_id":"app-1","type":2,"token":"token-1","member":{"roles":["config-role"],"permissions":"0"},"data":{"id":1487254261594325.5,"name":"this-is-iconic"}},"s":2,"t":"INTERACTION_CREATE"}
+            """)),
+            .error(URLError(.networkConnectionLost)),
+        ])
+        let secondSocket = StubDiscordGatewaySocket(receiveSteps: [
+            .message(gatewayMessage("""
+            {"op":10,"d":{"heartbeat_interval":60000},"s":null,"t":null}
+            """)),
+        ])
+        let factory = StubDiscordGatewaySocketFactory(sockets: [firstSocket, secondSocket])
+        let recorder = GatewayEventRecorder()
+        let client = DiscordGatewayClient(
+            token: "token",
+            gatewayURL: URL(string: "wss://gateway.discord.gg?v=10&encoding=json")!,
+            intents: 513,
+            logger: .init(label: "test"),
+            makeSocket: { url in
+                factory.makeSocket(url: url)
+            },
+            sleep: { duration in
+                try await Task.sleep(for: duration)
+            },
+            reconnectDelayProvider: { _ in 0 },
+            onEvent: { event in
+                await recorder.append(event)
+            }
+        )
+
+        try await client.start()
+
+        try await eventually {
+            factory.requestedURLs.count == 2
+        }
+
+        let requestedURLs = factory.requestedURLs
+        #expect(requestedURLs[0].absoluteString == "wss://gateway.discord.gg?v=10&encoding=json")
+        #expect(requestedURLs[1].absoluteString == "wss://gateway.resume.discord.gg?v=10&encoding=json")
+        #expect(await recorder.snapshot().isEmpty)
+
+        try await eventually {
+            let secondPayloads = try await secondSocket.sentPayloadObjects()
+            return gatewayOpcode(secondPayloads.first?["op"]) == DiscordGatewayOpCode.resume
+        }
+
+        let secondPayloads = try await secondSocket.sentPayloadObjects()
+        #expect(gatewayOpcode(secondPayloads.first?["op"]) == DiscordGatewayOpCode.resume)
 
         await client.stop()
     }

@@ -227,7 +227,7 @@ Priority 3: Gateway resilience and bot-level survival
 - [x] Add a `DiscordGatewayClientTests` case proving an `INTERACTION_CREATE` event with numeric `data.id` reaches the interaction handler instead of tearing down the Gateway session.
 - [x] Add a `DiscordGatewayClientTests` case for unexpected but ignorable dispatch payload shapes where one bad event should be rejected without poisoning the rest of the session when the event can safely be dropped.
 - [x] Add a `FizzeBotTests` case that verifies the bot remains operational after a recoverable interaction decode anomaly, so resilience is tested at the application layer instead of only at the model layer.
-- [ ] Review existing Gateway reconnect tests and add any missing assertions around session reuse versus fresh identify so future payload-tolerance fixes do not accidentally weaken reconnect behavior.
+- [x] Review existing Gateway reconnect tests and add any missing assertions around session reuse versus fresh identify so future payload-tolerance fixes do not accidentally weaken reconnect behavior.
 
 Priority 4: End-to-end user-flow confidence for iconic commands
 
