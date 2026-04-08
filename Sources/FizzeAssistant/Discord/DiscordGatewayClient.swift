@@ -306,27 +306,77 @@ actor DiscordGatewayClient {
             ])
 
         case "GUILD_MEMBER_ADD":
-            let event = try decodePayload(DiscordGuildMemberAddEvent.self, from: payload)
-            await onEvent(.memberJoined(event))
+            try await decodeAndForwardDispatch(
+                eventName: "GUILD_MEMBER_ADD",
+                payload: payload,
+                safeToDropOnDecodeFailure: true,
+                decode: { try decodePayload(DiscordGuildMemberAddEvent.self, from: $0) },
+                forward: { await onEvent(.memberJoined($0)) }
+            )
 
         case "GUILD_MEMBER_REMOVE":
-            let event = try decodePayload(DiscordGuildMemberRemoveEvent.self, from: payload)
-            await onEvent(.memberRemoved(event))
+            try await decodeAndForwardDispatch(
+                eventName: "GUILD_MEMBER_REMOVE",
+                payload: payload,
+                safeToDropOnDecodeFailure: true,
+                decode: { try decodePayload(DiscordGuildMemberRemoveEvent.self, from: $0) },
+                forward: { await onEvent(.memberRemoved($0)) }
+            )
 
         case "GUILD_BAN_ADD":
-            let event = try decodePayload(DiscordGuildBanAddEvent.self, from: payload)
-            await onEvent(.memberBanned(event))
+            try await decodeAndForwardDispatch(
+                eventName: "GUILD_BAN_ADD",
+                payload: payload,
+                safeToDropOnDecodeFailure: true,
+                decode: { try decodePayload(DiscordGuildBanAddEvent.self, from: $0) },
+                forward: { await onEvent(.memberBanned($0)) }
+            )
 
         case "INTERACTION_CREATE":
-            let event = try decodePayload(DiscordInteraction.self, from: payload)
-            await onEvent(.interaction(event))
+            try await decodeAndForwardDispatch(
+                eventName: "INTERACTION_CREATE",
+                payload: payload,
+                safeToDropOnDecodeFailure: true,
+                decode: { try decodePayload(DiscordInteraction.self, from: $0) },
+                forward: { await onEvent(.interaction($0)) }
+            )
 
         case "MESSAGE_CREATE":
-            let event = try decodePayload(DiscordMessageEvent.self, from: payload)
-            await onEvent(.message(event))
+            try await decodeAndForwardDispatch(
+                eventName: "MESSAGE_CREATE",
+                payload: payload,
+                safeToDropOnDecodeFailure: true,
+                decode: { try decodePayload(DiscordMessageEvent.self, from: $0) },
+                forward: { await onEvent(.message($0)) }
+            )
 
         default:
             break
+        }
+    }
+
+    private func decodeAndForwardDispatch<EventPayload>(
+        eventName: String,
+        payload: JSONValue?,
+        safeToDropOnDecodeFailure: Bool,
+        decode: (JSONValue?) throws -> EventPayload,
+        forward: (EventPayload) async -> Void
+    ) async throws {
+        do {
+            let event = try decode(payload)
+            await forward(event)
+        } catch {
+            guard safeToDropOnDecodeFailure else {
+                throw error
+            }
+
+            logger.warning(
+                "DiscordGatewayClient.handleDispatch: Discord sent a dispatch payload this bot could not decode cleanly, so that single event will be dropped while the Gateway session stays online.",
+                metadata: [
+                    "event_name": .string(eventName),
+                    "error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error)),
+                ]
+            )
         }
     }
 

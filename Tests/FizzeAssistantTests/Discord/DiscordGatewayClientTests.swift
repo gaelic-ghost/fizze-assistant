@@ -154,6 +154,103 @@ struct DiscordGatewayClientTests {
     }
 
     @Test
+    func interactionDispatchWithNumericCommandIDReachesHandlerWithoutReconnect() async throws {
+        let socket = StubDiscordGatewaySocket(receiveSteps: [
+            .message(gatewayMessage("""
+            {"op":10,"d":{"heartbeat_interval":60000},"s":null,"t":null}
+            """)),
+            .message(gatewayMessage("""
+            {"op":0,"d":{"id":"interaction-1","application_id":"app-1","type":2,"token":"token-1","member":{"roles":["config-role"],"permissions":"0"},"data":{"id":1487254261594325000,"name":"this-is-iconic"}},"s":2,"t":"INTERACTION_CREATE"}
+            """)),
+        ])
+        let factory = StubDiscordGatewaySocketFactory(sockets: [socket])
+        let recorder = GatewayEventRecorder()
+        let client = DiscordGatewayClient(
+            token: "token",
+            gatewayURL: URL(string: "wss://gateway.discord.gg?v=10&encoding=json")!,
+            intents: 513,
+            logger: .init(label: "test"),
+            makeSocket: { url in
+                factory.makeSocket(url: url)
+            },
+            sleep: { duration in
+                try await Task.sleep(for: duration)
+            },
+            reconnectDelayProvider: { _ in 0 },
+            onEvent: { event in
+                await recorder.append(event)
+            }
+        )
+
+        try await client.start()
+
+        try await eventually {
+            await recorder.snapshot().count == 1
+        }
+
+        let events = await recorder.snapshot()
+        guard case let .interaction(interaction) = events.first else {
+            Issue.record("Expected a forwarded interaction event.")
+            return
+        }
+        #expect(interaction.data?.id == "1487254261594325000")
+        #expect(interaction.data?.name == "this-is-iconic")
+        #expect(factory.requestedURLs.count == 1)
+
+        await client.stop()
+    }
+
+    @Test
+    func malformedInteractionDispatchIsDroppedWithoutPoisoningLaterEvents() async throws {
+        let socket = StubDiscordGatewaySocket(receiveSteps: [
+            .message(gatewayMessage("""
+            {"op":10,"d":{"heartbeat_interval":60000},"s":null,"t":null}
+            """)),
+            .message(gatewayMessage("""
+            {"op":0,"d":{"id":"interaction-1","application_id":"app-1","type":2,"token":"token-1","member":{"roles":["config-role"],"permissions":"0"},"data":{"id":1487254261594325.5,"name":"this-is-iconic"}},"s":2,"t":"INTERACTION_CREATE"}
+            """)),
+            .message(gatewayMessage("""
+            {"op":0,"d":{"id":"message-1","channel_id":"channel-1","guild_id":"guild-1","content":"fizze","author":{"id":"user-1","username":"gale","global_name":"Gale"}},"s":3,"t":"MESSAGE_CREATE"}
+            """)),
+        ])
+        let factory = StubDiscordGatewaySocketFactory(sockets: [socket])
+        let recorder = GatewayEventRecorder()
+        let client = DiscordGatewayClient(
+            token: "token",
+            gatewayURL: URL(string: "wss://gateway.discord.gg?v=10&encoding=json")!,
+            intents: 513,
+            logger: .init(label: "test"),
+            makeSocket: { url in
+                factory.makeSocket(url: url)
+            },
+            sleep: { duration in
+                try await Task.sleep(for: duration)
+            },
+            reconnectDelayProvider: { _ in 0 },
+            onEvent: { event in
+                await recorder.append(event)
+            }
+        )
+
+        try await client.start()
+
+        try await eventually {
+            await recorder.snapshot().count == 1
+        }
+
+        let events = await recorder.snapshot()
+        guard case let .message(message) = events.first else {
+            Issue.record("Expected the valid message event after the malformed interaction payload.")
+            return
+        }
+        #expect(message.id == "message-1")
+        #expect(message.content == "fizze")
+        #expect(factory.requestedURLs.count == 1)
+
+        await client.stop()
+    }
+
+    @Test
     func missedHeartbeatAckSchedulesReconnect() async throws {
         let firstSocket = StubDiscordGatewaySocket(receiveSteps: [
             .message(gatewayMessage("""

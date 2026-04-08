@@ -325,6 +325,69 @@ struct FizzeBotTests {
         #expect(sourceChannelPostAttempts == 2)
     }
 
+    @Test
+    func recoverableInteractionFailureDoesNotBlockLaterMessageHandling() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            try stubBotRequest(request)
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.iconic_messages = [
+                    "fizze time": IconicMessageConfiguration(content: "sparkle", embeds: nil),
+                ]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        await bot.handleEventForTesting(
+            .interaction(
+                DiscordInteraction(
+                    id: "interaction-bad-1",
+                    application_id: "app-1",
+                    type: DiscordInteractionType.modalSubmit,
+                    token: "token-1",
+                    channel_id: nil,
+                    member: DiscordInteractionMember(
+                        user: DiscordUser(id: "friend-7", username: "friend", global_name: "Friend"),
+                        roles: ["config-role"],
+                        permissions: "0"
+                    ),
+                    data: DiscordInteractionData(
+                        id: nil,
+                        name: nil,
+                        custom_id: nil,
+                        component_type: nil,
+                        options: nil,
+                        components: nil
+                    )
+                )
+            )
+        )
+
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-after-bad-interaction",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "FIZZE TIME",
+                    author: DiscordUser(id: "friend-8", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+
+        let messageRequest = try #require(
+            stub.requests().last(where: { $0.url?.path == "/api/v10/channels/source-channel/messages" })
+        )
+        let payload = try decodeRequestBody(DiscordMessageCreate.self, from: messageRequest)
+        #expect(payload.content == "sparkle")
+    }
+
     // MARK: Helpers
 
     private func stubBotRequest(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {
