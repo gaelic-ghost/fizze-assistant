@@ -173,7 +173,7 @@ Docs-informed implementation notes:
 
 Batch planning before the priority list:
 
-- [ ] Batch 0: fix or quarantine the unrelated `BotApplicationTests.configInitCreatesConfigurationFile` failure before broadening the suite further, so package-wide runs stay trustworthy while adding coverage.
+- [x] Batch 0: fix or quarantine the unrelated `BotApplicationTests.configInitCreatesConfigurationFile` failure before broadening the suite further, so package-wide runs stay trustworthy while adding coverage.
 - [x] Batch 1: extend `DiscordInteractionRouterTests` and the existing interaction fixtures first, because the highest-priority roadmap gaps all sit on top of that harness and can share setup work.
 - [x] Batch 2: add Discord command-registration and payload-shape guardrails next, using parameterized tests where possible so field-length and numeric-or-string wire-shape cases stay compact.
 - [x] Batch 3: deepen Gateway and `FizzeBot` resilience coverage only after the decode and registration guardrails are in place, so those tests focus on survival behavior rather than basic payload validation.
@@ -181,10 +181,10 @@ Batch planning before the priority list:
 
 Batch 0 implementation checklist:
 
-- [ ] Update `BotApplicationTests.configInitCreatesConfigurationFile` in `Tests/FizzeAssistantTests/App/BotApplicationTests.swift` so it asserts against the actual active config target created by `BotApplication.run(command: .configInit, ...)`, which now comes from `ConfigurationStore.initializeConfigurationFileIfNeeded()` and resolves to `fizze-assistant-local.json`.
-- [ ] Add a companion assertion in that same test that the initialized file can be decoded as `BotConfigurationFile`, so the package-level smoke test checks both path behavior and file validity.
-- [ ] Decide whether `config init` should still leave the baseline `fizze-assistant.json` absent in explicit `--config` mode or whether the app behavior should be adjusted instead; record that decision in the test name or assertion wording so the contract is clear.
-- [ ] Re-run package-level `swift test` immediately after the Batch 0 change and do not start Batch 1 work until the suite is green again.
+- [x] Update `BotApplicationTests.configInitCreatesConfigurationFile` in `Tests/FizzeAssistantTests/App/BotApplicationTests.swift` so it asserts the current `config init` contract: the explicit `--config` path creates `fizze-assistant.json` as the baseline template and `fizze-assistant-local.json` as the writable local override layered on top.
+- [x] Add companion assertions in that same test that both initialized files can be decoded as `BotConfigurationFile`, so the package-level smoke test checks both path behavior and file validity.
+- [x] Record the `config init` decision in the test wording and assertions: explicit `--config` mode now creates both the baseline file and the local override instead of leaving the baseline absent.
+- [x] Re-run package-level `swift test` immediately after the Batch 0 change and keep the suite green while the later coverage batches land.
 
 Batch 1 implementation checklist:
 
@@ -239,18 +239,18 @@ Priority 4: End-to-end user-flow confidence for iconic commands
 
 Execution order:
 
-- [ ] Implement Priority 1 first so the next round of wizard UX work lands against explicit unhappy-path coverage.
-- [ ] Implement Priority 2 second so Discord registration and payload-shape mistakes fail in tests before they fail at startup or during live interaction handling.
-- [ ] Implement Priority 3 third so Gateway and bot resilience are covered after the payload-shape guardrails are in place.
-- [ ] Implement Priority 4 last as the confidence layer that protects the overall non-technical Discord user experience.
+- [x] Implement Priority 1 first so the next round of wizard UX work lands against explicit unhappy-path coverage.
+- [x] Implement Priority 2 second so Discord registration and payload-shape mistakes fail in tests before they fail at startup or during live interaction handling.
+- [x] Implement Priority 3 third so Gateway and bot resilience are covered after the payload-shape guardrails are in place.
+- [x] Implement Priority 4 last as the confidence layer that protects the overall non-technical Discord user experience.
 
 Definition of done for this testing pass:
 
-- [ ] `swift test` is green again at the package level, not just in filtered suites.
+- [x] `swift test` is green again at the package level, not just in filtered suites.
 - [ ] The new regression coverage reads cleanly in terminal output without needing to inspect implementation details to understand the failing behavior.
 - [ ] Repetitive Discord wire-format and command-shape assertions are consolidated with parameterized tests where that keeps the suite shorter and easier to extend.
-- [ ] Any suite that must stay serialized has an obvious shared-state reason instead of inheriting serialization accidentally.
-- [ ] The roadmap checklist reflects what landed, what is still pending, and which future slices would benefit from tags or sanitizer runs.
+- [x] Any suite that must stay serialized has an obvious shared-state reason instead of inheriting serialization accidentally.
+- [x] The roadmap checklist reflects what landed, what is still pending, and which future slices would benefit from tags or sanitizer runs.
 
 ## Risks and mitigations
 
