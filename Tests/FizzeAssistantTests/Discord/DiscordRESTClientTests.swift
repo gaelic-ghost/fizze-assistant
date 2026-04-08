@@ -265,6 +265,52 @@ struct DiscordRESTClientTests {
     }
 
     @Test
+    func upsertGuildCommandsSurfacesFieldLevelValidationErrorsFromDiscord() async throws {
+        let stub = makeDiscordRESTClient { request in
+            #expect(request.url?.path == "/api/v10/applications/app-1/guilds/guild-1/commands")
+            #expect(request.httpMethod == "PUT")
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 400, httpVersion: nil, headerFields: [:])!,
+                Data(
+                    #"""
+                    {
+                      "code": 50035,
+                      "message": "Invalid Form Body",
+                      "errors": {
+                        "0": {
+                          "name": {
+                            "_errors": [
+                              {
+                                "code": "APPLICATION_COMMAND_INVALID_NAME",
+                                "message": "Command name is invalid"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    """#.utf8
+                )
+            )
+        }
+
+        let error = await #expect(throws: RESTError.self, performing: {
+            try await stub.client.upsertGuildCommands(
+                application_id: "app-1",
+                guild_id: "guild-1",
+                commands: [
+                    DiscordSlashCommand(name: "say", description: "Speak through the bot in another channel.", options: nil),
+                ]
+            )
+        })
+
+        let description = error?.localizedDescription
+        #expect(description?.contains("Invalid Form Body") == true)
+        #expect(description?.contains("`0.name`: Command name is invalid") == true)
+    }
+
+    @Test
     func createInteractionResponseRetriesAfterTransientNetworkLoss() async throws {
         let lock = NSLock()
         var attempts = 0

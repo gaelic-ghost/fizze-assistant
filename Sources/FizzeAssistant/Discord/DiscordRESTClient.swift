@@ -470,8 +470,74 @@ enum RESTError: LocalizedError {
         case .authenticationRejected:
             return "DiscordRESTClient.performRawRequest: Discord rejected the bot token with HTTP 401, so further authenticated API calls are paused for this process. The most likely cause is that the configured bot token is invalid, revoked, or belongs to a different application."
         case let .discordError(statusCode, body):
+            if let summary = DiscordAPIErrorFormatter.validationSummary(statusCode: statusCode, body: body) {
+                return "DiscordRESTClient.performRawRequest: Discord responded with HTTP \(statusCode) for this API call. \(summary) Response body: \(body). The most likely cause is that the outgoing Discord payload shape no longer matches Discord's current validation rules."
+            }
+
             return "DiscordRESTClient.performRawRequest: Discord responded with HTTP \(statusCode) for this API call. Response body: \(body). The most likely cause is a missing permission, an unknown resource ID, or a rate-limit response that exceeded the retry policy."
         }
+    }
+}
+
+private enum DiscordAPIErrorFormatter {
+    // MARK: Formatting
+
+    static func validationSummary(statusCode: Int, body: String) -> String? {
+        guard statusCode == 400 else { return nil }
+        guard let data = body.data(using: .utf8) else { return nil }
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        guard
+            let code = object["code"] as? Int,
+            code == 50_035,
+            let message = object["message"] as? String,
+            let errors = object["errors"] as? [String: Any]
+        else {
+            return nil
+        }
+
+        let fieldErrors = flattenValidationErrors(errors)
+        guard !fieldErrors.isEmpty else {
+            return "Discord reported `\(message)` for this request."
+        }
+
+        let renderedErrors = fieldErrors
+            .map { path, detail in "`\(path)`: \(detail)" }
+            .joined(separator: "; ")
+
+        return "Discord reported `\(message)` for this request, with field-level validation errors at \(renderedErrors)."
+    }
+
+    // MARK: Private Helpers
+
+    private static func flattenValidationErrors(
+        _ object: [String: Any],
+        path: [String] = []
+    ) -> [(String, String)] {
+        var collected: [(String, String)] = []
+
+        if
+            let errors = object["_errors"] as? [[String: Any]],
+            let joinedMessages = errors
+                .compactMap({ $0["message"] as? String })
+                .joined(separator: ", ")
+                .nilIfEmpty
+        {
+            let renderedPath = path.joined(separator: ".")
+            collected.append((renderedPath, joinedMessages))
+        }
+
+        for (key, value) in object where key != "_errors" {
+            guard let nested = value as? [String: Any] else { continue }
+            collected.append(contentsOf: flattenValidationErrors(nested, path: path + [key]))
+        }
+
+        return collected
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 

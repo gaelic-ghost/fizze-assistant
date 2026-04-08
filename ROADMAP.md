@@ -174,7 +174,7 @@ Docs-informed implementation notes:
 Batch planning before the priority list:
 
 - [ ] Batch 0: fix or quarantine the unrelated `BotApplicationTests.configInitCreatesConfigurationFile` failure before broadening the suite further, so package-wide runs stay trustworthy while adding coverage.
-- [ ] Batch 1: extend `DiscordInteractionRouterTests` and the existing interaction fixtures first, because the highest-priority roadmap gaps all sit on top of that harness and can share setup work.
+- [x] Batch 1: extend `DiscordInteractionRouterTests` and the existing interaction fixtures first, because the highest-priority roadmap gaps all sit on top of that harness and can share setup work.
 - [ ] Batch 2: add Discord command-registration and payload-shape guardrails next, using parameterized tests where possible so field-length and numeric-or-string wire-shape cases stay compact.
 - [ ] Batch 3: deepen Gateway and `FizzeBot` resilience coverage only after the decode and registration guardrails are in place, so those tests focus on survival behavior rather than basic payload validation.
 - [ ] Batch 4: add the broader iconic create/edit confidence tests last, once the unhappy-path and payload-boundary behavior is already locked in.
@@ -188,38 +188,38 @@ Batch 0 implementation checklist:
 
 Batch 1 implementation checklist:
 
-- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicReturnsTypoOrMissingTriggerGuidanceForUnknownTrigger()` covering the `/this-isnt-iconic` trigger modal submission when the normalized trigger key does not exist.
-- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicRejectsRicherPayloadsWithLocalConfigEditingGuidance()` covering an iconic entry whose payload cannot round-trip through the current modal editor.
-- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsIconicContinueButtonReturnsReadableErrorWhenDraftIsMissing()` by creating a draft-producing first step, removing the draft from `WarningStore`, then sending the continue-button interaction.
-- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicContinueButtonReturnsReadableErrorWhenDraftIsMissing()` using the same stale-draft pattern for the edit flow.
-- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `unknownSecondStepModalReturnsOutdatedModalGuidance()` by submitting a synthetic modal ID that no longer matches either wizard content step.
-- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicNormalizesMixedCaseAndSurroundingWhitespaceBeforeLookup()` so the edit flow is locked to the production normalization behavior instead of exact raw input.
-- [ ] Add one text-only create-flow assertion in `DiscordInteractionRouterTests` now, even though it also appears later in Priority 4, because it is a cheap extension of the current harness and will validate the persisted no-URL shape while the wizard tests are already open.
+- [x] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicReturnsTypoOrMissingTriggerGuidanceForUnknownTrigger()` covering the `/this-isnt-iconic` trigger modal submission when the normalized trigger key does not exist.
+- [x] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicRejectsRicherPayloadsWithLocalConfigEditingGuidance()` covering an iconic entry whose payload cannot round-trip through the current modal editor.
+- [x] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsIconicContinueButtonReturnsReadableErrorWhenDraftIsMissing()` by creating a draft-producing first step, removing the draft from `WarningStore`, then sending the continue-button interaction.
+- [x] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicContinueButtonReturnsReadableErrorWhenDraftIsMissing()` using the same stale-draft pattern for the edit flow.
+- [x] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `unknownSecondStepModalReturnsOutdatedModalGuidance()` by submitting a synthetic modal ID that no longer matches either wizard content step.
+- [x] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicNormalizesMixedCaseAndSurroundingWhitespaceBeforeLookup()` so the edit flow is locked to the production normalization behavior instead of exact raw input.
+- [x] Add one text-only create-flow assertion in `DiscordInteractionRouterTests` now, even though it also appears later in Priority 4, because it is a cheap extension of the current harness and will validate the persisted no-URL shape while the wizard tests are already open.
 
 Batch 1 fixture and harness improvements:
 
-- [ ] Extend `Tests/FizzeAssistantTests/TestSupport/TestFixtures.swift` with a tiny helper for loading the persisted local config, so each router test stops repeating `JSONDecoder().decode(... Data(contentsOf: ...fizze-assistant-local.json))`.
-- [ ] Extend `Tests/FizzeAssistantTests/TestSupport/TestFixtures.swift` or `Tests/FizzeAssistantTests/TestSupport/InteractionTestFixtures.swift` with a helper that returns the last `InteractionCallbackPayload`, so the router tests can read like user flows instead of request-body plumbing.
+- [x] Extend `Tests/FizzeAssistantTests/TestSupport/TestFixtures.swift` with a tiny helper for loading the persisted local config, so each router test stops repeating `JSONDecoder().decode(... Data(contentsOf: ...fizze-assistant-local.json))`.
+- [x] Extend `Tests/FizzeAssistantTests/TestSupport/TestFixtures.swift` or `Tests/FizzeAssistantTests/TestSupport/InteractionTestFixtures.swift` with a helper that returns the last `InteractionCallbackPayload`, so the router tests can read like user flows instead of request-body plumbing.
 - [ ] Consider a focused `makeRouterAndStub()` helper for `DiscordInteractionRouterTests` only if it removes obvious duplication without hiding test intent; keep it local to the interaction test support layer rather than introducing a broader abstraction.
-- [ ] Keep `DiscordInteractionRouterTests` serialized for now because they share filesystem-backed config and warning-store state, but add a short comment explaining why the suite stays serialized so that choice remains intentional.
+- [x] Keep `DiscordInteractionRouterTests` serialized for now because they share filesystem-backed config and warning-store state, but add a short comment explaining why the suite stays serialized so that choice remains intentional.
 - [ ] Prefer parameterized tests only for the normalization variants if more than two inputs are added; keep the unhappy-path user-flow tests separate and named individually so their failure output stays story-like and readable.
 
 Priority 1: Wizard unhappy-path regression coverage
 
-- [ ] Add a `DiscordInteractionRouterTests` case for `/this-isnt-iconic` when the submitted trigger does not exist, and assert the returned error stays human-friendly and typo-oriented.
-- [ ] Add a `DiscordInteractionRouterTests` case for `/this-isnt-iconic` when the target iconic entry uses a richer payload than the wizard can round-trip, and assert the bot returns the explicit `fizze-assistant-local.json` guidance instead of flattening the message.
-- [ ] Add a `DiscordInteractionRouterTests` case for a stale create-flow continue button after the draft was removed, and assert the bot returns a readable stale-session error instead of failing opaquely.
-- [ ] Add a `DiscordInteractionRouterTests` case for a stale edit-flow continue button after the draft was removed, and assert the same operator-facing clarity for the edit path.
-- [ ] Add a `DiscordInteractionRouterTests` case for an outdated second-step modal submission so old open modals fail with the current “unknown modal step” guidance instead of creating partial state.
-- [ ] Add a `DiscordInteractionRouterTests` case for edit lookup with mixed casing and extra surrounding whitespace so the normalized-trigger path is locked in for real user input.
+- [x] Add a `DiscordInteractionRouterTests` case for `/this-isnt-iconic` when the submitted trigger does not exist, and assert the returned error stays human-friendly and typo-oriented.
+- [x] Add a `DiscordInteractionRouterTests` case for `/this-isnt-iconic` when the target iconic entry uses a richer payload than the wizard can round-trip, and assert the bot returns the explicit `fizze-assistant-local.json` guidance instead of flattening the message.
+- [x] Add a `DiscordInteractionRouterTests` case for a stale create-flow continue button after the draft was removed, and assert the bot returns a readable stale-session error instead of failing opaquely.
+- [x] Add a `DiscordInteractionRouterTests` case for a stale edit-flow continue button after the draft was removed, and assert the same operator-facing clarity for the edit path.
+- [x] Add a `DiscordInteractionRouterTests` case for an outdated second-step modal submission so old open modals fail with the current “unknown modal step” guidance instead of creating partial state.
+- [x] Add a `DiscordInteractionRouterTests` case for edit lookup with mixed casing and extra surrounding whitespace so the normalized-trigger path is locked in for real user input.
 
 Priority 2: Discord registration and payload-shape guardrails
 
-- [ ] Add `DiscordCommandRegistrarTests` checks for slash-command token safety so command names stay within Discord's regex rules before they reach live registration.
-- [ ] Add `DiscordCommandRegistrarTests` checks for command description length and other obvious registration-shape constraints that can be validated locally.
-- [ ] Add `DiscordCommandRegistrarTests` checks for wizard button and modal `custom_id` lengths so future wizard growth does not quietly produce invalid component payloads.
-- [ ] Add a `DiscordRESTClientTests` case for command-registration failures that include Discord's field-level validation errors, and assert the surfaced error message makes the bad request obvious to the operator.
-- [ ] Add a `DiscordModelsTests` or `DiscordGatewayPayloadTests` case for a full `INTERACTION_CREATE` payload with numeric `data.id`, not just the local model decode, so the exact live regression shape stays covered.
+- [x] Add `DiscordCommandRegistrarTests` checks for slash-command token safety so command names stay within Discord's regex rules before they reach live registration.
+- [x] Add `DiscordCommandRegistrarTests` checks for command description length and other obvious registration-shape constraints that can be validated locally.
+- [x] Add `DiscordCommandRegistrarTests` checks for wizard button and modal `custom_id` lengths so future wizard growth does not quietly produce invalid component payloads.
+- [x] Add a `DiscordRESTClientTests` case for command-registration failures that include Discord's field-level validation errors, and assert the surfaced error message makes the bad request obvious to the operator.
+- [x] Add a `DiscordModelsTests` or `DiscordGatewayPayloadTests` case for a full `INTERACTION_CREATE` payload with numeric `data.id`, not just the local model decode, so the exact live regression shape stays covered.
 - [ ] Add additional decode tests for interaction-adjacent Discord payload fields that may appear as either strings or numbers when the wire format is effectively opaque to the bot.
 
 Priority 3: Gateway resilience and bot-level survival

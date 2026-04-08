@@ -66,4 +66,28 @@ struct DiscordModelsTests {
         #expect(interaction.data?.id == "1487254261594325000")
         #expect(interaction.data?.name == "this-is-iconic")
     }
+
+    @Test
+    func interactionDataIDRejectsFractionalNumbers() {
+        let data = """
+        {
+          "id": "interaction-1",
+          "application_id": "app-1",
+          "type": 2,
+          "token": "token-1",
+          "member": {
+            "roles": ["config-role"],
+            "permissions": "0"
+          },
+          "data": {
+            "id": 1487254261594325.5,
+            "name": "this-is-iconic"
+          }
+        }
+        """.data(using: .utf8)!
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(DiscordInteraction.self, from: data)
+        }
+    }
 }

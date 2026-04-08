@@ -100,4 +100,37 @@ struct DiscordGatewayPayloadTests {
         #expect(event.guild_id == "guild-123")
         #expect(event.author.displayName == "Gale")
     }
+
+    @Test
+    func interactionCreatePayloadDecodesNumericCommandIDFromGatewayEnvelope() throws {
+        let data = """
+        {
+          "op": 0,
+          "d": {
+            "id": "interaction-1",
+            "application_id": "app-1",
+            "type": 2,
+            "token": "token-1",
+            "member": {
+              "roles": ["config-role"],
+              "permissions": "0"
+            },
+            "data": {
+              "id": 1487254261594325000,
+              "name": "this-is-iconic"
+            }
+          },
+          "s": 3,
+          "t": "INTERACTION_CREATE"
+        }
+        """.data(using: .utf8)!
+
+        let envelope = try JSONDecoder().decode(DiscordGatewayEnvelope.self, from: data)
+        let payloadData = try JSONEncoder().encode(envelope.d)
+        let interaction = try JSONDecoder().decode(DiscordInteraction.self, from: payloadData)
+
+        #expect(envelope.t == "INTERACTION_CREATE")
+        #expect(interaction.data?.id == "1487254261594325000")
+        #expect(interaction.data?.name == "this-is-iconic")
+    }
 }
