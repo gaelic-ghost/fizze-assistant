@@ -14,6 +14,52 @@ struct ConfigurationStoreTests {
     // MARK: Tests
 
     @Test
+    func explicitConfigurationPathLoadsReadyRuntimeConfiguration() async throws {
+        let rootURL = try makeTemporaryRootURL()
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        let configurationFile = BotConfigurationFile(
+            application_id: "app",
+            guild_id: "guild",
+            default_member_role_id: "member",
+            allowed_staff_role_ids: ["staff-a", "staff-b"],
+            allowed_config_role_ids: ["owner-a", "owner-b"],
+            database_path: ".data/fizze-assistant.sqlite",
+            welcome_channel_id: "welcome",
+            leave_channel_id: "leave",
+            mod_log_channel_id: "mod-log",
+            suggestions_channel_id: "suggestions",
+            warn_users_via_dm: false,
+            welcome_message: "hi",
+            voluntary_leave_message: "bye",
+            kick_message: "kick",
+            ban_message: "ban",
+            unknown_removal_message: "unknown",
+            role_assignment_failure_message: "role failure",
+            warning_dm_template: "warn",
+            bot_mention_responses: ["hello {user_mention}"],
+            trigger_cooldown_seconds: 30,
+            leave_audit_log_lookback_seconds: 30,
+            trigger_matching_mode: .exact,
+            iconic_messages: [:]
+        )
+
+        try writeConfiguration(configurationFile, to: configURL)
+
+        let store = try ConfigurationStore.load(from: configURL, environment: [
+            "DISCORD_BOT_TOKEN": "token",
+        ])
+        let configuration = try await store.readyConfiguration()
+
+        #expect(configuration.allowed_staff_role_ids == ["staff-a", "staff-b"])
+        #expect(configuration.allowed_config_role_ids == ["owner-a", "owner-b"])
+        #expect(configuration.database_path == ".data/fizze-assistant.sqlite")
+        #expect(configuration.suggestions_channel_id == "suggestions")
+        #expect(configuration.trigger_matching_mode == .exact)
+        #expect(configuration.iconic_messages.isEmpty)
+        #expect(configuration.bot_mention_responses == ["hello {user_mention}"])
+    }
+
+    @Test
     func defaultLoaderPrefersLocalConfigurationWhenPresent() async throws {
         let rootURL = try makeTemporaryRootURL()
         let baselineURL = rootURL.appendingPathComponent("fizze-assistant.json")

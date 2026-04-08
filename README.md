@@ -20,6 +20,29 @@ This bot is intentionally small. It avoids unnecessary wrappers and service laye
 
 No inbound tunnel is required. The bot uses Discord’s outbound Gateway connection and normal outbound HTTPS requests.
 
+## Project Layout
+
+The package is organized to keep the source tree and test tree aligned:
+
+- `Sources/FizzeAssistant/App`
+  - CLI entry points, startup wiring, and top-level bot orchestration
+- `Sources/FizzeAssistant/Discord`
+  - Discord wire models, Gateway handling, and REST client behavior
+- `Sources/FizzeAssistant/Features/Configuration`
+  - baseline and local config models, runtime projection, and persistence
+- `Sources/FizzeAssistant/Features/Interactions`
+  - slash-command routing, authorization, parsing, and wizard flows
+- `Sources/FizzeAssistant/Features/Messaging`
+  - iconic-response matching and template rendering
+- `Sources/FizzeAssistant/Features/Moderation`
+  - warning storage and leave-reason classification
+- `Sources/FizzeAssistant/Features/Permissions`
+  - Discord permission math and human-readable setup reports
+- `Tests/FizzeAssistantTests/...`
+  - mirrors those same `App`, `Discord`, and `Features/*` slices, with shared fixtures under `Tests/FizzeAssistantTests/TestSupport`
+
+That alignment is intentional: if a source file changes, its nearest tests should be easy to find in the matching test area instead of hidden behind a separate integration-only hierarchy.
+
 ## Requirements
 
 - Swift 6.2 or newer
@@ -110,6 +133,20 @@ There is also a thin setup script for the Mac mini flow. It loads `.env.local`, 
 
 ```bash
 ./scripts/setup.sh
+```
+
+Test the whole package locally:
+
+```bash
+swift test
+```
+
+If you are iterating on one area, the filtered suites follow the same source-oriented layout. For example:
+
+```bash
+swift test --filter ConfigurationStoreTests
+swift test --filter DiscordInteractionRouterTests
+swift test --filter '(DiscordModelsTests|DiscordGatewayPayloadTests)'
 ```
 
 Discord-side runtime config commands:

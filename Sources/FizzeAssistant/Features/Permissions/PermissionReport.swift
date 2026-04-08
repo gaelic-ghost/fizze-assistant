@@ -2,10 +2,14 @@ import Foundation
 
 struct PermissionReport: Sendable {
     struct Issue: Hashable, Sendable {
+        // MARK: Types
+
         enum Severity: String, Sendable {
             case info = "INFO"
             case warning = "WARN"
         }
+
+        // MARK: Stored Properties
 
         var severity: Severity
         var message: String

@@ -369,6 +369,8 @@ struct DiscordMessageEvent: Codable, Sendable {
     }
 }
 
+// MARK: - Snowflake Decoding
+
 private extension KeyedDecodingContainer {
     func decodeDiscordSnowflake(forKey key: Key) throws -> DiscordSnowflake {
         if let stringValue = try? decode(String.self, forKey: key) {
@@ -450,6 +452,8 @@ private extension KeyedDecodingContainer {
     }
 }
 
+// MARK: - Coding Keys
+
 private struct DiscordArrayIndexCodingKey: CodingKey {
     let intValue: Int?
     let stringValue: String
@@ -473,6 +477,8 @@ private struct DiscordArrayIndexCodingKey: CodingKey {
 // MARK: - JSON Support
 
 enum JSONValue: Codable, Sendable {
+    // MARK: Cases
+
     case string(String)
     case integer(Int64)
     case number(Double)
@@ -480,6 +486,8 @@ enum JSONValue: Codable, Sendable {
     case object([String: JSONValue])
     case array([JSONValue])
     case null
+
+    // MARK: Codable
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -526,6 +534,8 @@ enum JSONValue: Codable, Sendable {
             try container.encodeNil()
         }
     }
+
+    // MARK: Accessors
 
     var stringValue: String? {
         if case let .string(value) = self {

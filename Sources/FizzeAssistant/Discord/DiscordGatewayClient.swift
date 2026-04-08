@@ -227,6 +227,8 @@ actor DiscordGatewayClient {
         }
     }
 
+    // MARK: Heartbeats And Session Setup
+
     private func heartbeatLoop() async {
         while isRunning {
             do {
@@ -379,6 +381,8 @@ actor DiscordGatewayClient {
             )
         }
     }
+
+    // MARK: Gateway Payload Parsing
 
     private func decodePayload<T: Decodable>(_ type: T.Type, from payload: JSONValue?) throws -> T {
         guard let payload else {

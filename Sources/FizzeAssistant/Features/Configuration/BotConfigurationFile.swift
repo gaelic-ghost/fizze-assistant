@@ -302,7 +302,11 @@ struct AppConfiguration: Sendable {
 
     var say_success_message: String { "Sent." }
 
+    // MARK: Static Properties
+
     static let required_permission_integer = 268_438_656
+
+    // MARK: Derived Values
 
     var install_url: String {
         "https://discord.com/oauth2/authorize?client_id=\(application_id)&scope=bot%20applications.commands&permissions=\(Self.required_permission_integer)"
@@ -352,6 +356,8 @@ struct IconicMessageConfiguration: Codable, Hashable, Sendable {
 
         return IconicMessageConfiguration(content: normalizedContent, embeds: normalizedEmbeds)
     }
+
+    // MARK: Trigger Normalization
 
     static func normalizedTrigger(_ trigger: String) throws -> String {
         let normalized = trigger.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
