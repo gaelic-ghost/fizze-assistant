@@ -250,4 +250,58 @@ struct DiscordInteractionRouterTests {
         #expect(persisted.iconic_messages["fizze time"]?.embeds?.first?.description == "new sparkle https://example.com/new.png")
         #expect(persisted.iconic_messages["fizze time"]?.embeds?.first?.image?.url == "https://example.com/new.png")
     }
+
+    @Test
+    func unauthorizedThisIsIconicCommandNamesTheIconicCommandInsteadOfConfig() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+        let router = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        await router.handle(
+            slashInteraction(id: "interaction-unauthorized-1", name: "this-is-iconic", memberRoles: ["staff-role"]),
+            guildName: "Guild"
+        )
+
+        let errorPayload = try decodeRequestBody(
+            InteractionCallbackPayload.self,
+            from: try #require(stub.requests().last)
+        )
+        let message = try #require(errorPayload.data?.content)
+        #expect(message.contains("`/this-is-iconic` is limited"))
+        #expect(!message.contains("`/config` is limited"))
+    }
+
+    @Test
+    func unauthorizedThisIsIconicContinueButtonNamesTheWizardStepInsteadOfConfig() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+        let router = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        await router.handle(
+            buttonInteraction(
+                id: "interaction-unauthorized-2",
+                customID: ThisIsIconicWizard.continueButtonPrefix + "draft-123",
+                memberRoles: ["staff-role"]
+            ),
+            guildName: "Guild"
+        )
+
+        let errorPayload = try decodeRequestBody(
+            InteractionCallbackPayload.self,
+            from: try #require(stub.requests().last)
+        )
+        let message = try #require(errorPayload.data?.content)
+        #expect(message.contains("the `this-is-iconic` continue button"))
+        #expect(!message.contains("`/config` is limited"))
+    }
 }

@@ -69,15 +69,15 @@ actor DiscordInteractionRouter {
             try await handleModerationCommand(interaction, data: data, configuration: configuration, guildName: guildName)
 
         case "config":
-            try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
+            try ensureConfigAuthorized(member: interaction.member, configuration: configuration, actionName: "/config")
             try await handleConfigCommand(interaction, data: data)
 
         case "this-is-iconic":
-            try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
+            try ensureConfigAuthorized(member: interaction.member, configuration: configuration, actionName: "/this-is-iconic")
             try await startThisIsIconicWizard(interaction)
 
         case "this-isnt-iconic":
-            try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
+            try ensureConfigAuthorized(member: interaction.member, configuration: configuration, actionName: "/this-isnt-iconic")
             try await startThisIsntIconicWizard(interaction)
 
         default:

@@ -37,7 +37,11 @@ extension DiscordInteractionRouter {
         }
 
         if customID.hasPrefix(ThisIsIconicWizard.continueButtonPrefix) {
-            try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
+            try ensureConfigAuthorized(
+                member: interaction.member,
+                configuration: configuration,
+                actionName: "the `this-is-iconic` continue button"
+            )
             let sessionID = String(customID.dropFirst(ThisIsIconicWizard.continueButtonPrefix.count))
             let userID = try requireInteractionUserID(interaction, context: "this-is-iconic continue button")
             _ = try await warningStore.iconicWizardDraft(sessionID: sessionID, userID: userID)
@@ -58,7 +62,11 @@ extension DiscordInteractionRouter {
         }
 
         if customID.hasPrefix(ThisIsntIconicWizard.continueButtonPrefix) {
-            try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
+            try ensureConfigAuthorized(
+                member: interaction.member,
+                configuration: configuration,
+                actionName: "the `this-isn't-iconic` continue button"
+            )
             let sessionID = String(customID.dropFirst(ThisIsntIconicWizard.continueButtonPrefix.count))
             let userID = try requireInteractionUserID(interaction, context: "this-isn't-iconic continue button")
             let draft = try await warningStore.iconicWizardDraft(sessionID: sessionID, userID: userID)
@@ -99,10 +107,14 @@ extension DiscordInteractionRouter {
         }
 
         let userID = try requireInteractionUserID(interaction, context: "this-is-iconic modal submission")
-        try ensureConfigAuthorized(member: interaction.member, configuration: configuration)
 
         switch customID {
         case ThisIsIconicWizard.triggerModalID:
+            try ensureConfigAuthorized(
+                member: interaction.member,
+                configuration: configuration,
+                actionName: "the `this-is-iconic` trigger modal"
+            )
             let submittedTrigger = try requireComponentValue(
                 customID: ThisIsIconicWizard.triggerFieldID,
                 from: data.components,
@@ -127,6 +139,11 @@ extension DiscordInteractionRouter {
             )
 
         case ThisIsntIconicWizard.triggerModalID:
+            try ensureConfigAuthorized(
+                member: interaction.member,
+                configuration: configuration,
+                actionName: "the `this-isn't-iconic` trigger modal"
+            )
             let submittedTrigger = try requireComponentValue(
                 customID: ThisIsntIconicWizard.triggerFieldID,
                 from: data.components,
@@ -155,6 +172,11 @@ extension DiscordInteractionRouter {
             )
 
         case let modalID where modalID.hasPrefix(ThisIsIconicWizard.contentModalPrefix):
+            try ensureConfigAuthorized(
+                member: interaction.member,
+                configuration: configuration,
+                actionName: "the `this-is-iconic` content modal"
+            )
             let sessionID = String(modalID.dropFirst(ThisIsIconicWizard.contentModalPrefix.count))
             let draft = try await warningStore.iconicWizardDraft(sessionID: sessionID, userID: userID)
             let submittedContent = try requireComponentValue(
@@ -168,6 +190,11 @@ extension DiscordInteractionRouter {
             try await respond(to: interaction, content: ThisIsIconicWizard.successMessage, ephemeral: true)
 
         case let modalID where modalID.hasPrefix(ThisIsntIconicWizard.contentModalPrefix):
+            try ensureConfigAuthorized(
+                member: interaction.member,
+                configuration: configuration,
+                actionName: "the `this-isn't-iconic` content modal"
+            )
             let sessionID = String(modalID.dropFirst(ThisIsntIconicWizard.contentModalPrefix.count))
             let draft = try await warningStore.iconicWizardDraft(sessionID: sessionID, userID: userID)
             let submittedContent = try requireComponentValue(
