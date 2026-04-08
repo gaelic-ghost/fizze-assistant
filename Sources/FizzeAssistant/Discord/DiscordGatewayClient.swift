@@ -398,6 +398,8 @@ actor DiscordGatewayClient {
         }
 
         switch heartbeatValue {
+        case let .integer(value):
+            return UInt64(value) * 1_000_000
         case let .number(value):
             return UInt64(value) * 1_000_000
         case let .string(value):
@@ -430,6 +432,8 @@ actor DiscordGatewayClient {
         switch value {
         case let .string(string):
             return string
+        case let .integer(number):
+            return String(number)
         case let .number(number):
             if number.rounded() == number {
                 return String(Int(number))

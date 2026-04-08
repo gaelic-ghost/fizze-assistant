@@ -25,7 +25,13 @@ struct DiscordGatewayPayloadTests {
             return
         }
 
-        guard case let .number(interval)? = payload["heartbeat_interval"] else {
+        let interval: Int64
+        switch payload["heartbeat_interval"] {
+        case let .integer(value)?:
+            interval = value
+        case let .number(value)?:
+            interval = Int64(value)
+        default:
             Issue.record("Expected heartbeat_interval in hello payload.")
             return
         }
@@ -132,5 +138,81 @@ struct DiscordGatewayPayloadTests {
         #expect(envelope.t == "INTERACTION_CREATE")
         #expect(interaction.data?.id == "1487254261594325000")
         #expect(interaction.data?.name == "this-is-iconic")
+    }
+
+    @Test
+    func interactionCreatePayloadDecodesNumericTopLevelAndMemberSnowflakesFromGatewayEnvelope() throws {
+        let data = """
+        {
+          "op": 0,
+          "d": {
+            "id": 1487254261594325201,
+            "application_id": 1487254261594325202,
+            "type": 2,
+            "token": "token-1",
+            "channel_id": 1487254261594325203,
+            "member": {
+              "user": {
+                "id": 1487254261594325204,
+                "username": "gale",
+                "global_name": "Gale"
+              },
+              "roles": [1487254261594325205, "1487254261594325206"],
+              "permissions": "0"
+            },
+            "data": {
+              "id": "1487254261594325207",
+              "name": "this-is-iconic"
+            }
+          },
+          "s": 4,
+          "t": "INTERACTION_CREATE"
+        }
+        """.data(using: .utf8)!
+
+        let envelope = try JSONDecoder().decode(DiscordGatewayEnvelope.self, from: data)
+        let payloadData = try JSONEncoder().encode(envelope.d)
+        let interaction = try JSONDecoder().decode(DiscordInteraction.self, from: payloadData)
+
+        #expect(envelope.t == "INTERACTION_CREATE")
+        #expect(interaction.id == "1487254261594325201")
+        #expect(interaction.application_id == "1487254261594325202")
+        #expect(interaction.channel_id == "1487254261594325203")
+        #expect(interaction.member?.user?.id == "1487254261594325204")
+        #expect(interaction.member?.roles == ["1487254261594325205", "1487254261594325206"])
+    }
+
+    @Test
+    func messageCreatePayloadDecodesNumericSnowflakesFromGatewayEnvelope() throws {
+        let data = """
+        {
+          "op": 0,
+          "d": {
+            "id": 1487254261594325301,
+            "channel_id": 1487254261594325302,
+            "guild_id": 1487254261594325303,
+            "content": "fizze",
+            "author": {
+              "id": 1487254261594325304,
+              "username": "gale",
+              "global_name": "Gale"
+            },
+            "webhook_id": 1487254261594325305
+          },
+          "s": 5,
+          "t": "MESSAGE_CREATE"
+        }
+        """.data(using: .utf8)!
+
+        let envelope = try JSONDecoder().decode(DiscordGatewayEnvelope.self, from: data)
+        let payloadData = try JSONEncoder().encode(envelope.d)
+        let event = try JSONDecoder().decode(DiscordMessageEvent.self, from: payloadData)
+
+        #expect(envelope.t == "MESSAGE_CREATE")
+        #expect(event.id == "1487254261594325301")
+        #expect(event.channel_id == "1487254261594325302")
+        #expect(event.guild_id == "1487254261594325303")
+        #expect(event.author.id == "1487254261594325304")
+        #expect(event.webhook_id == "1487254261594325305")
     }
 }

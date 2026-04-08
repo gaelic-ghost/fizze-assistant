@@ -220,7 +220,7 @@ Priority 2: Discord registration and payload-shape guardrails
 - [x] Add `DiscordCommandRegistrarTests` checks for wizard button and modal `custom_id` lengths so future wizard growth does not quietly produce invalid component payloads.
 - [x] Add a `DiscordRESTClientTests` case for command-registration failures that include Discord's field-level validation errors, and assert the surfaced error message makes the bad request obvious to the operator.
 - [x] Add a `DiscordModelsTests` or `DiscordGatewayPayloadTests` case for a full `INTERACTION_CREATE` payload with numeric `data.id`, not just the local model decode, so the exact live regression shape stays covered.
-- [ ] Add additional decode tests for interaction-adjacent Discord payload fields that may appear as either strings or numbers when the wire format is effectively opaque to the bot.
+- [x] Add additional decode tests for interaction-adjacent Discord payload fields that may appear as either strings or numbers when the wire format is effectively opaque to the bot.
 
 Priority 3: Gateway resilience and bot-level survival
 

@@ -119,6 +119,12 @@ actor GatewayEventRecorder {
 }
 
 func gatewayOpcode(_ value: JSONValue?) -> Int? {
-    guard case let .number(number)? = value else { return nil }
-    return Int(number)
+    switch value {
+    case let .integer(number)?:
+        return Int(number)
+    case let .number(number)?:
+        return Int(number)
+    default:
+        return nil
+    }
 }

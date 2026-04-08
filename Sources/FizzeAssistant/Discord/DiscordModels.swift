@@ -12,6 +12,19 @@ struct DiscordUser: Codable, Sendable {
     var displayName: String {
         global_name ?? username
     }
+
+    init(id: DiscordSnowflake, username: String, global_name: String?) {
+        self.id = id
+        self.username = username
+        self.global_name = global_name
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeDiscordSnowflake(forKey: .id)
+        username = try container.decode(String.self, forKey: .username)
+        global_name = try container.decodeIfPresent(String.self, forKey: .global_name)
+    }
 }
 
 // MARK: - Guild and Channel Models
@@ -91,6 +104,35 @@ struct DiscordInteraction: Codable, Sendable {
     var channel_id: DiscordSnowflake?
     var member: DiscordInteractionMember?
     var data: DiscordInteractionData?
+
+    init(
+        id: DiscordSnowflake,
+        application_id: DiscordSnowflake,
+        type: Int,
+        token: String,
+        channel_id: DiscordSnowflake?,
+        member: DiscordInteractionMember?,
+        data: DiscordInteractionData?
+    ) {
+        self.id = id
+        self.application_id = application_id
+        self.type = type
+        self.token = token
+        self.channel_id = channel_id
+        self.member = member
+        self.data = data
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeDiscordSnowflake(forKey: .id)
+        application_id = try container.decodeDiscordSnowflake(forKey: .application_id)
+        type = try container.decode(Int.self, forKey: .type)
+        token = try container.decode(String.self, forKey: .token)
+        channel_id = try container.decodeDiscordSnowflakeIfPresent(forKey: .channel_id)
+        member = try container.decodeIfPresent(DiscordInteractionMember.self, forKey: .member)
+        data = try container.decodeIfPresent(DiscordInteractionData.self, forKey: .data)
+    }
 }
 
 struct DiscordInteractionMember: Codable, Sendable {
@@ -100,6 +142,19 @@ struct DiscordInteractionMember: Codable, Sendable {
 
     var permissionSet: PermissionSet {
         PermissionSet(rawValue: UInt64(permissions ?? "") ?? 0)
+    }
+
+    init(user: DiscordUser?, roles: [DiscordSnowflake], permissions: String?) {
+        self.user = user
+        self.roles = roles
+        self.permissions = permissions
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        user = try container.decodeIfPresent(DiscordUser.self, forKey: .user)
+        roles = try container.decodeDiscordSnowflakeArray(forKey: .roles)
+        permissions = try container.decodeIfPresent(String.self, forKey: .permissions)
     }
 }
 
@@ -138,27 +193,7 @@ struct DiscordInteractionData: Codable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        if let stringID = try? container.decodeIfPresent(String.self, forKey: .id) {
-            id = stringID
-        } else if let intID = try? container.decodeIfPresent(Int64.self, forKey: .id) {
-            id = String(intID)
-        } else if let doubleID = try? container.decodeIfPresent(Double.self, forKey: .id) {
-            if doubleID.rounded() == doubleID {
-                id = String(Int64(doubleID))
-            } else {
-                throw DecodingError.typeMismatch(
-                    String.self,
-                    DecodingError.Context(
-                        codingPath: container.codingPath + [CodingKeys.id],
-                        debugDescription: "Expected Discord interaction data id to be a string or whole number."
-                    )
-                )
-            }
-        } else {
-            id = nil
-        }
-
+        id = try container.decodeDiscordSnowflakeIfPresent(forKey: .id)
         name = try container.decodeIfPresent(String.self, forKey: .name)
         custom_id = try container.decodeIfPresent(String.self, forKey: .custom_id)
         component_type = try container.decodeIfPresent(Int.self, forKey: .component_type)
@@ -192,6 +227,32 @@ struct DiscordMessage: Codable, Sendable {
     var author: DiscordUser
     var embeds: [DiscordEmbed]?
     var flags: Int?
+
+    init(
+        id: DiscordSnowflake,
+        channel_id: DiscordSnowflake?,
+        content: String,
+        author: DiscordUser,
+        embeds: [DiscordEmbed]?,
+        flags: Int?
+    ) {
+        self.id = id
+        self.channel_id = channel_id
+        self.content = content
+        self.author = author
+        self.embeds = embeds
+        self.flags = flags
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeDiscordSnowflake(forKey: .id)
+        channel_id = try container.decodeDiscordSnowflakeIfPresent(forKey: .channel_id)
+        content = try container.decode(String.self, forKey: .content)
+        author = try container.decode(DiscordUser.self, forKey: .author)
+        embeds = try container.decodeIfPresent([DiscordEmbed].self, forKey: .embeds)
+        flags = try container.decodeIfPresent(Int.self, forKey: .flags)
+    }
 }
 
 struct DiscordEmbed: Codable, Hashable, Sendable {
@@ -280,12 +341,140 @@ struct DiscordMessageEvent: Codable, Sendable {
     var content: String
     var author: DiscordUser
     var webhook_id: DiscordSnowflake?
+
+    init(
+        id: DiscordSnowflake,
+        channel_id: DiscordSnowflake,
+        guild_id: DiscordSnowflake?,
+        content: String,
+        author: DiscordUser,
+        webhook_id: DiscordSnowflake?
+    ) {
+        self.id = id
+        self.channel_id = channel_id
+        self.guild_id = guild_id
+        self.content = content
+        self.author = author
+        self.webhook_id = webhook_id
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeDiscordSnowflake(forKey: .id)
+        channel_id = try container.decodeDiscordSnowflake(forKey: .channel_id)
+        guild_id = try container.decodeDiscordSnowflakeIfPresent(forKey: .guild_id)
+        content = try container.decode(String.self, forKey: .content)
+        author = try container.decode(DiscordUser.self, forKey: .author)
+        webhook_id = try container.decodeDiscordSnowflakeIfPresent(forKey: .webhook_id)
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func decodeDiscordSnowflake(forKey key: Key) throws -> DiscordSnowflake {
+        if let stringValue = try? decode(String.self, forKey: key) {
+            return stringValue
+        }
+        if let decimalValue = try? decode(Decimal.self, forKey: key) {
+            if let wholeNumber = Self.wholeNumberString(from: decimalValue) {
+                return wholeNumber
+            }
+            throw DecodingError.typeMismatch(
+                String.self,
+                DecodingError.Context(
+                    codingPath: codingPath + [key],
+                    debugDescription: "Expected Discord snowflake fields to be strings or whole numbers."
+                )
+            )
+        }
+
+        throw DecodingError.typeMismatch(
+            String.self,
+            DecodingError.Context(
+                codingPath: codingPath + [key],
+                debugDescription: "Expected Discord snowflake fields to be strings or whole numbers."
+            )
+        )
+    }
+
+    func decodeDiscordSnowflakeIfPresent(forKey key: Key) throws -> DiscordSnowflake? {
+        guard contains(key), try decodeNil(forKey: key) == false else {
+            return nil
+        }
+        return try decodeDiscordSnowflake(forKey: key)
+    }
+
+    func decodeDiscordSnowflakeArray(forKey key: Key) throws -> [DiscordSnowflake] {
+        var container = try nestedUnkeyedContainer(forKey: key)
+        var values: [DiscordSnowflake] = []
+        var index = 0
+
+        while !container.isAtEnd {
+            if let stringValue = try? container.decode(String.self) {
+                values.append(stringValue)
+            } else if let decimalValue = try? container.decode(Decimal.self) {
+                if let wholeNumber = Self.wholeNumberString(from: decimalValue) {
+                    values.append(wholeNumber)
+                } else {
+                    throw DecodingError.typeMismatch(
+                        String.self,
+                        DecodingError.Context(
+                            codingPath: codingPath + [key, DiscordArrayIndexCodingKey(index: index)],
+                            debugDescription: "Expected Discord snowflake fields to be strings or whole numbers."
+                        )
+                    )
+                }
+            } else {
+                throw DecodingError.typeMismatch(
+                    String.self,
+                    DecodingError.Context(
+                        codingPath: codingPath + [key, DiscordArrayIndexCodingKey(index: index)],
+                        debugDescription: "Expected Discord snowflake fields to be strings or whole numbers."
+                    )
+                )
+            }
+
+            index += 1
+        }
+
+        return values
+    }
+
+    private static func wholeNumberString(from decimal: Decimal) -> String? {
+        var original = decimal
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &original, 0, .plain)
+        guard rounded == decimal else {
+            return nil
+        }
+        return NSDecimalNumber(decimal: rounded).stringValue
+    }
+}
+
+private struct DiscordArrayIndexCodingKey: CodingKey {
+    let intValue: Int?
+    let stringValue: String
+
+    init(index: Int) {
+        intValue = index
+        stringValue = String(index)
+    }
+
+    init?(intValue: Int) {
+        self.intValue = intValue
+        stringValue = String(intValue)
+    }
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        intValue = Int(stringValue)
+    }
 }
 
 // MARK: - JSON Support
 
 enum JSONValue: Codable, Sendable {
     case string(String)
+    case integer(Int64)
     case number(Double)
     case bool(Bool)
     case object([String: JSONValue])
@@ -297,6 +486,8 @@ enum JSONValue: Codable, Sendable {
 
         if let value = try? container.decode(String.self) {
             self = .string(value)
+        } else if let value = try? container.decode(Int64.self) {
+            self = .integer(value)
         } else if let value = try? container.decode(Double.self) {
             self = .number(value)
         } else if let value = try? container.decode(Bool.self) {
@@ -321,6 +512,8 @@ enum JSONValue: Codable, Sendable {
         switch self {
         case let .string(value):
             try container.encode(value)
+        case let .integer(value):
+            try container.encode(value)
         case let .number(value):
             try container.encode(value)
         case let .bool(value):
@@ -337,6 +530,10 @@ enum JSONValue: Codable, Sendable {
     var stringValue: String? {
         if case let .string(value) = self {
             return value
+        }
+
+        if case let .integer(value) = self {
+            return String(value)
         }
 
         if case let .number(value) = self {
