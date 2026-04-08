@@ -9,11 +9,17 @@ struct BotApplicationTests {
     func configInitCreatesConfigurationFile() async throws {
         let rootURL = try makeTemporaryTestDirectory()
         let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        let localURL = rootURL.appendingPathComponent("fizze-assistant-local.json")
         let options = try SharedOptions.parse(["--config", configURL.path])
 
         try await BotApplication.run(command: .configInit, options: options)
 
         #expect(FileManager.default.fileExists(atPath: configURL.path))
+        #expect(FileManager.default.fileExists(atPath: localURL.path))
+        let baseline = try JSONDecoder().decode(BotConfigurationFile.self, from: Data(contentsOf: configURL))
+        let local = try JSONDecoder().decode(BotConfigurationFile.self, from: Data(contentsOf: localURL))
+        #expect(baseline.application_id == BotConfigurationFile.defaults.application_id)
+        #expect(local.application_id == baseline.application_id)
     }
 
     @Test

@@ -141,6 +141,7 @@ struct ConfigurationStoreTests {
     func explicitBaselinePathRedirectsToLocalOverride() async throws {
         let rootURL = try makeTemporaryRootURL()
         let baselineURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        let localURL = rootURL.appendingPathComponent("fizze-assistant-local.json")
         try writeConfiguration(
             makeConfiguration(rootURL: rootURL, applicationID: "baseline-app"),
             to: baselineURL
@@ -153,8 +154,31 @@ struct ConfigurationStoreTests {
 
         let resolvedURL = await store.configurationURL()
         #expect(resolvedURL.lastPathComponent == "fizze-assistant-local.json")
+        #expect(FileManager.default.fileExists(atPath: localURL.path))
         let runtime = await store.configurationFileContents()
         #expect(runtime.application_id == "baseline-app")
+    }
+
+    @Test
+    func explicitMissingBaselinePathCreatesBaselineThenSeedsLocalOverride() async throws {
+        let rootURL = try makeTemporaryRootURL()
+        let baselineURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        let localURL = rootURL.appendingPathComponent("fizze-assistant-local.json")
+
+        let store = try ConfigurationStore.load(
+            from: baselineURL,
+            environment: ["DISCORD_BOT_TOKEN": "token"]
+        )
+
+        let resolvedURL = await store.configurationURL()
+        #expect(resolvedURL.lastPathComponent == "fizze-assistant-local.json")
+        #expect(FileManager.default.fileExists(atPath: baselineURL.path))
+        #expect(FileManager.default.fileExists(atPath: localURL.path))
+
+        let baseline = try JSONDecoder().decode(BotConfigurationFile.self, from: Data(contentsOf: baselineURL))
+        let local = try JSONDecoder().decode(BotConfigurationFile.self, from: Data(contentsOf: localURL))
+        #expect(baseline.application_id == BotConfigurationFile.defaults.application_id)
+        #expect(local.application_id == baseline.application_id)
     }
 
     @Test

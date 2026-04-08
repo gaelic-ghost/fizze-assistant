@@ -40,15 +40,12 @@ actor ConfigurationStore {
             environment: environment,
             fileManager: .default
         )
+        try ensureBaselineTemplateExistsIfNeeded(at: resolution.baselineTemplateURL, fileManager: .default)
         if !FileManager.default.fileExists(atPath: resolution.activeURL.path) {
             if let baselineTemplateURL = resolution.baselineTemplateURL {
                 try seedLocalConfigurationIfNeeded(from: baselineTemplateURL, to: resolution.activeURL, fileManager: .default)
             } else if resolution.activeURL.lastPathComponent == localConfigurationFileName {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                let directoryURL = resolution.activeURL.deletingLastPathComponent()
-                try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-                try encoder.encode(BotConfigurationFile.defaults).write(to: resolution.activeURL)
+                try writeDefaultConfiguration(to: resolution.activeURL, fileManager: .default)
             }
         }
         let configurationFile = try loadConfigurationFile(from: resolution.activeURL)
@@ -91,6 +88,7 @@ actor ConfigurationStore {
         }
 
         if let baselineTemplateURL {
+            try Self.ensureBaselineTemplateExistsIfNeeded(at: baselineTemplateURL, fileManager: .default)
             try Self.seedLocalConfigurationIfNeeded(from: baselineTemplateURL, to: configURL, fileManager: .default)
             if FileManager.default.fileExists(atPath: configURL.path) {
                 let data = try Data(contentsOf: configURL)
@@ -253,6 +251,22 @@ actor ConfigurationStore {
         return .defaults
     }
 
+    private static func ensureBaselineTemplateExistsIfNeeded(at baselineTemplateURL: URL?, fileManager: FileManager) throws {
+        guard let baselineTemplateURL else {
+            return
+        }
+
+        guard baselineTemplateURL.lastPathComponent == baselineConfigurationFileName else {
+            return
+        }
+
+        guard !fileManager.fileExists(atPath: baselineTemplateURL.path) else {
+            return
+        }
+
+        try writeDefaultConfiguration(to: baselineTemplateURL, fileManager: fileManager)
+    }
+
     private static func seedLocalConfigurationIfNeeded(from baselineURL: URL, to localURL: URL, fileManager: FileManager) throws {
         guard !fileManager.fileExists(atPath: localURL.path) else {
             return
@@ -264,6 +278,13 @@ actor ConfigurationStore {
 
         try fileManager.createDirectory(at: localURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fileManager.copyItem(at: baselineURL, to: localURL)
+    }
+
+    private static func writeDefaultConfiguration(to url: URL, fileManager: FileManager) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoder.encode(BotConfigurationFile.defaults).write(to: url)
     }
 
     private func persist(configurationFile: BotConfigurationFile) throws {

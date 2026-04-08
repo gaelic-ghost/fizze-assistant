@@ -161,6 +161,49 @@ Scope:
 - [ ] Strengthen the test suite at the Discord API boundary so malformed or surprising payloads do not silently turn into live reconnect incidents.
 - [ ] Add user-flow confidence checks for the iconic authoring commands so non-technical Discord users get predictable behavior across create and edit flows.
 
+Docs-informed implementation notes:
+
+- [ ] Keep leaning on Swift Testing as the primary framework, since the official guidance emphasizes parameterized tests, traits, suite organization, and parallel-by-default execution for Swift package workflows.
+- [ ] Prefer parameterized tests anywhere the same assertion shape should cover many Discord payload variants, command-shape limits, or trigger-normalization inputs, so repetitive guardrail cases do not turn into copy-pasted test bodies.
+- [ ] Use explicit suite structure and descriptive test names when adding the new wizard unhappy-path coverage, so the regression intent is obvious in terminal output without reopening the test source.
+- [ ] Be deliberate about parallel execution: keep broad suite behavior parallel by default, but use `.serialized` only for tests that truly share mutable filesystem, database, or gateway-session state.
+- [ ] Add tags only when they unlock a real workflow, especially for future `wizard`, `gateway`, and `discord-wire-format` slices that would benefit from filtered local runs during triage.
+- [ ] Treat `#require` as the boundary guard for decoding or setup steps that must stop a test immediately, and reserve `#expect` for the actual behavior assertions so failures stay easier to read.
+- [ ] Keep XCTest out of new coverage unless a concrete constraint demands it, because the package is already aligned with Swift Testing and the current tests run there successfully.
+
+Batch planning before the priority list:
+
+- [ ] Batch 0: fix or quarantine the unrelated `BotApplicationTests.configInitCreatesConfigurationFile` failure before broadening the suite further, so package-wide runs stay trustworthy while adding coverage.
+- [ ] Batch 1: extend `DiscordInteractionRouterTests` and the existing interaction fixtures first, because the highest-priority roadmap gaps all sit on top of that harness and can share setup work.
+- [ ] Batch 2: add Discord command-registration and payload-shape guardrails next, using parameterized tests where possible so field-length and numeric-or-string wire-shape cases stay compact.
+- [ ] Batch 3: deepen Gateway and `FizzeBot` resilience coverage only after the decode and registration guardrails are in place, so those tests focus on survival behavior rather than basic payload validation.
+- [ ] Batch 4: add the broader iconic create/edit confidence tests last, once the unhappy-path and payload-boundary behavior is already locked in.
+
+Batch 0 implementation checklist:
+
+- [ ] Update `BotApplicationTests.configInitCreatesConfigurationFile` in `Tests/FizzeAssistantTests/App/BotApplicationTests.swift` so it asserts against the actual active config target created by `BotApplication.run(command: .configInit, ...)`, which now comes from `ConfigurationStore.initializeConfigurationFileIfNeeded()` and resolves to `fizze-assistant-local.json`.
+- [ ] Add a companion assertion in that same test that the initialized file can be decoded as `BotConfigurationFile`, so the package-level smoke test checks both path behavior and file validity.
+- [ ] Decide whether `config init` should still leave the baseline `fizze-assistant.json` absent in explicit `--config` mode or whether the app behavior should be adjusted instead; record that decision in the test name or assertion wording so the contract is clear.
+- [ ] Re-run package-level `swift test` immediately after the Batch 0 change and do not start Batch 1 work until the suite is green again.
+
+Batch 1 implementation checklist:
+
+- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicReturnsTypoOrMissingTriggerGuidanceForUnknownTrigger()` covering the `/this-isnt-iconic` trigger modal submission when the normalized trigger key does not exist.
+- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicRejectsRicherPayloadsWithLocalConfigEditingGuidance()` covering an iconic entry whose payload cannot round-trip through the current modal editor.
+- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsIconicContinueButtonReturnsReadableErrorWhenDraftIsMissing()` by creating a draft-producing first step, removing the draft from `WarningStore`, then sending the continue-button interaction.
+- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicContinueButtonReturnsReadableErrorWhenDraftIsMissing()` using the same stale-draft pattern for the edit flow.
+- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `unknownSecondStepModalReturnsOutdatedModalGuidance()` by submitting a synthetic modal ID that no longer matches either wizard content step.
+- [ ] In `Tests/FizzeAssistantTests/Features/Interactions/DiscordInteractionRouterTests.swift`, add `thisIsntIconicNormalizesMixedCaseAndSurroundingWhitespaceBeforeLookup()` so the edit flow is locked to the production normalization behavior instead of exact raw input.
+- [ ] Add one text-only create-flow assertion in `DiscordInteractionRouterTests` now, even though it also appears later in Priority 4, because it is a cheap extension of the current harness and will validate the persisted no-URL shape while the wizard tests are already open.
+
+Batch 1 fixture and harness improvements:
+
+- [ ] Extend `Tests/FizzeAssistantTests/TestSupport/TestFixtures.swift` with a tiny helper for loading the persisted local config, so each router test stops repeating `JSONDecoder().decode(... Data(contentsOf: ...fizze-assistant-local.json))`.
+- [ ] Extend `Tests/FizzeAssistantTests/TestSupport/TestFixtures.swift` or `Tests/FizzeAssistantTests/TestSupport/InteractionTestFixtures.swift` with a helper that returns the last `InteractionCallbackPayload`, so the router tests can read like user flows instead of request-body plumbing.
+- [ ] Consider a focused `makeRouterAndStub()` helper for `DiscordInteractionRouterTests` only if it removes obvious duplication without hiding test intent; keep it local to the interaction test support layer rather than introducing a broader abstraction.
+- [ ] Keep `DiscordInteractionRouterTests` serialized for now because they share filesystem-backed config and warning-store state, but add a short comment explaining why the suite stays serialized so that choice remains intentional.
+- [ ] Prefer parameterized tests only for the normalization variants if more than two inputs are added; keep the unhappy-path user-flow tests separate and named individually so their failure output stays story-like and readable.
+
 Priority 1: Wizard unhappy-path regression coverage
 
 - [ ] Add a `DiscordInteractionRouterTests` case for `/this-isnt-iconic` when the submitted trigger does not exist, and assert the returned error stays human-friendly and typo-oriented.
@@ -200,6 +243,14 @@ Execution order:
 - [ ] Implement Priority 2 second so Discord registration and payload-shape mistakes fail in tests before they fail at startup or during live interaction handling.
 - [ ] Implement Priority 3 third so Gateway and bot resilience are covered after the payload-shape guardrails are in place.
 - [ ] Implement Priority 4 last as the confidence layer that protects the overall non-technical Discord user experience.
+
+Definition of done for this testing pass:
+
+- [ ] `swift test` is green again at the package level, not just in filtered suites.
+- [ ] The new regression coverage reads cleanly in terminal output without needing to inspect implementation details to understand the failing behavior.
+- [ ] Repetitive Discord wire-format and command-shape assertions are consolidated with parameterized tests where that keeps the suite shorter and easier to extend.
+- [ ] Any suite that must stay serialized has an obvious shared-state reason instead of inheriting serialization accidentally.
+- [ ] The roadmap checklist reflects what landed, what is still pending, and which future slices would benefit from tags or sanitizer runs.
 
 ## Risks and mitigations
 

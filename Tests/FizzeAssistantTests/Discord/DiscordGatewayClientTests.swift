@@ -47,6 +47,11 @@ struct DiscordGatewayClientTests {
         #expect(requestedURLs[0].absoluteString == "wss://gateway.discord.gg?v=10&encoding=json")
         #expect(requestedURLs[1].absoluteString == "wss://gateway.resume.discord.gg?v=10&encoding=json")
 
+        try await eventually {
+            let secondPayloads = try await secondSocket.sentPayloadObjects()
+            return gatewayOpcode(secondPayloads.first?["op"]) == DiscordGatewayOpCode.resume
+        }
+
         let firstPayloads = try await firstSocket.sentPayloadObjects()
         let secondPayloads = try await secondSocket.sentPayloadObjects()
         #expect(gatewayOpcode(firstPayloads.first?["op"]) == DiscordGatewayOpCode.identify)
