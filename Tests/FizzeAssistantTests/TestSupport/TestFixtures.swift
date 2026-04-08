@@ -1,5 +1,6 @@
 import Foundation
 import Logging
+import Testing
 @testable import FizzeAssistant
 
 func makeTemporaryTestDirectory() throws -> URL {
@@ -69,5 +70,19 @@ func makeRouter(
         configurationStore: configurationStore,
         warningStore: warningStore,
         logger: .init(label: "test")
+    )
+}
+
+func persistedLocalConfiguration(rootURL: URL) throws -> BotConfigurationFile {
+    try JSONDecoder().decode(
+        BotConfigurationFile.self,
+        from: Data(contentsOf: rootURL.appendingPathComponent("fizze-assistant-local.json"))
+    )
+}
+
+func lastInteractionPayload(from stub: StubbedDiscordRESTClient) throws -> InteractionCallbackPayload {
+    try decodeRequestBody(
+        InteractionCallbackPayload.self,
+        from: try #require(stub.requests().last)
     )
 }
