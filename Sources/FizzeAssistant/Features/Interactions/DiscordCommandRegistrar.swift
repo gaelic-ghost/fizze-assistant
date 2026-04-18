@@ -21,6 +21,11 @@ struct DiscordCommandRegistrar {
                 ]
             ),
             DiscordSlashCommand(
+                name: "sotd",
+                description: "Open the Song of the Day posting form.",
+                options: nil
+            ),
+            DiscordSlashCommand(
                 name: "warn",
                 description: "Record a moderator warning for a user.",
                 options: [
@@ -119,7 +124,7 @@ struct DiscordCommandRegistrar {
     var registrationValidationIssues: [String] {
         DiscordRegistrationValidator.issues(
             commands: guildCommands,
-            wizardCustomIDs: wizardCustomIDs(sessionID: String(repeating: "a", count: 36))
+            wizardCustomIDs: interactionCustomIDs(sessionID: String(repeating: "a", count: 36))
         )
     }
 
@@ -127,7 +132,7 @@ struct DiscordCommandRegistrar {
         let commands = guildCommands
         let validationIssues = DiscordRegistrationValidator.issues(
             commands: commands,
-            wizardCustomIDs: wizardCustomIDs(sessionID: String(repeating: "a", count: 36))
+            wizardCustomIDs: interactionCustomIDs(sessionID: String(repeating: "a", count: 36))
         )
 
         guard validationIssues.isEmpty else {
@@ -148,8 +153,11 @@ struct DiscordCommandRegistrar {
 
     // MARK: Private Helpers
 
-    private func wizardCustomIDs(sessionID: String) -> [String] {
+    private func interactionCustomIDs(sessionID: String) -> [String] {
         [
+            SongOfTheDayModal.modalID,
+            SongOfTheDayModal.messageFieldID,
+            SongOfTheDayModal.linksFieldID,
             ThisIsIconicWizard.triggerModalID,
             ThisIsIconicWizard.triggerFieldID,
             ThisIsIconicWizard.continueButtonPrefix + sessionID,

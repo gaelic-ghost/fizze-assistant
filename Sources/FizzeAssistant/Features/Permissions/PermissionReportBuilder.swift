@@ -2,7 +2,25 @@ import Foundation
 import Logging
 
 struct PermissionReportBuilder {
+    // MARK: Nested Types
+
+    private struct ChannelPermissionProbe {
+        let label: String
+        let id: String
+        let isConfiguredFeatureChannel: Bool
+        let reportsSuccessfulSend: Bool
+    }
+
     // MARK: Stored Properties
+
+    private static let startupPostingProbeChannels: [ChannelPermissionProbe] = [
+        .init(
+            label: "manual posting check",
+            id: AppConfiguration.song_of_the_day_channel_id,
+            isConfiguredFeatureChannel: false,
+            reportsSuccessfulSend: true
+        ),
+    ]
 
     let restClient: DiscordRESTClient
     let configuration: AppConfiguration
@@ -48,20 +66,34 @@ struct PermissionReportBuilder {
             issues.append(.init(severity: .warning, message: "Configured config-owner role ID \(roleID) is not currently present in the server."))
         }
 
-        let configuredChannels: [(String, String?)] = [
-            ("welcome", configuration.welcome_channel_id),
-            ("leave", configuration.leave_channel_id),
-            ("mod-log", configuration.mod_log_channel_id),
+        let configuredChannels: [ChannelPermissionProbe] = [
+            .init(label: "welcome", id: configuration.welcome_channel_id ?? "", isConfiguredFeatureChannel: true, reportsSuccessfulSend: false),
+            .init(label: "leave", id: configuration.leave_channel_id ?? "", isConfiguredFeatureChannel: true, reportsSuccessfulSend: false),
+            .init(label: "mod-log", id: configuration.mod_log_channel_id ?? "", isConfiguredFeatureChannel: true, reportsSuccessfulSend: false),
         ]
 
         var reportedChannelWarnings = Set<String>()
-        for (label, id) in configuredChannels {
-            guard let id else {
-                issues.append(.init(severity: .warning, message: "No \(label) channel is configured yet, so that announcement feature will stay off for now."))
+        for probe in configuredChannels + Self.startupPostingProbeChannels {
+            guard !probe.id.isEmpty else {
+                if probe.isConfiguredFeatureChannel {
+                    issues.append(.init(severity: .warning, message: "No \(probe.label) channel is configured yet, so that announcement feature will stay off for now."))
+                }
                 continue
             }
 
-            let channel = try await restClient.getChannel(id: id)
+            let channel: DiscordChannel
+            do {
+                channel = try await restClient.getChannel(id: probe.id)
+            } catch {
+                let key = "inspect:\(probe.id)"
+                guard reportedChannelWarnings.insert(key).inserted else {
+                    continue
+                }
+
+                issues.append(.init(severity: .warning, message: "PermissionReportBuilder.build: the bot could not inspect \(probe.label) channel `\(probe.id)`, so startup cannot confirm whether it can post there yet. The most likely cause is that the channel ID is wrong, the bot does not have `View Channel`, or Discord denied the lookup. Underlying error: \(Self.describe(error))"))
+                continue
+            }
+
             let permissions = PermissionCalculator.channelPermissions(
                 member: botMember,
                 roles: roles,
@@ -81,6 +113,11 @@ struct PermissionReportBuilder {
                 if reportedChannelWarnings.insert(key).inserted {
                     issues.append(.init(severity: .warning, message: "PermissionReportBuilder.build: the bot does not have `Send Messages` for \(channel.name ?? channel.id), so configured posts there will stay paused until that Discord permission is allowed. The most likely cause is a channel override or category override in the server."))
                 }
+                continue
+            }
+
+            if probe.reportsSuccessfulSend {
+                issues.append(.init(severity: .info, message: "PermissionReportBuilder.build: the bot can currently post in \(channel.name ?? channel.id) (`\(channel.id)`)."))
             }
         }
 
@@ -89,5 +126,15 @@ struct PermissionReportBuilder {
         issues.append(.init(severity: .info, message: "Permission integer: \(AppConfiguration.required_permission_integer) (`View Channel`, `Send Messages`, `Manage Roles`, `View Audit Log`)."))
 
         return PermissionReport(issues: issues)
+    }
+
+    // MARK: Private Helpers
+
+    private static func describe(_ error: Error) -> String {
+        if let localized = (error as? LocalizedError)?.errorDescription {
+            return localized
+        }
+
+        return String(describing: error)
     }
 }

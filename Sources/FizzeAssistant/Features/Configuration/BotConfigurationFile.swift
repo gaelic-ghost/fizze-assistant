@@ -301,9 +301,11 @@ struct AppConfiguration: Sendable {
     var iconic_messages: [String: IconicMessageConfiguration] { file.iconic_messages }
 
     var say_success_message: String { "Sent." }
+    var sotd_success_message: String { "Posted to Song of the Day." }
 
     // MARK: Static Properties
 
+    static let song_of_the_day_channel_id = "1493200053852966952"
     static let required_permission_integer = 268_438_656
 
     // MARK: Derived Values

@@ -88,6 +88,7 @@ enum BotApplication {
                 configuration: configuration,
                 logger: configuredLogger
             ).build()
+            report.log(to: configuredLogger)
             print(report.renderText())
 
         case .run:
@@ -97,6 +98,7 @@ enum BotApplication {
                 logger: configuredLogger
             ).build()
 
+            report.log(to: configuredLogger)
             print(report.renderText())
             print("Startup is continuing with the guidance above.")
 

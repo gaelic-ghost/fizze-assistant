@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 struct PermissionReport: Sendable {
     struct Issue: Hashable, Sendable {
@@ -30,5 +31,16 @@ struct PermissionReport: Sendable {
         }
         let lines = issues.map { "[\($0.severity.rawValue)] \($0.message)" }
         return (["Fizze Assistant setup report:", statusLine] + lines).joined(separator: "\n")
+    }
+
+    func log(to logger: Logger) {
+        for issue in issues {
+            switch issue.severity {
+            case .info:
+                logger.info("\(issue.message)")
+            case .warning:
+                logger.warning("\(issue.message)")
+            }
+        }
     }
 }
