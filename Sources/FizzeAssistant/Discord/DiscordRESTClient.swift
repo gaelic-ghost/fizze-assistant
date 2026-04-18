@@ -451,6 +451,7 @@ enum ManagedDiscordMessageKind: String, Sendable {
     case mentionReply = "mention_reply"
     case modLogWarning = "mod_log_warning"
     case sayCommand = "say_command"
+    case songOfTheDayCommand = "song_of_the_day_command"
     case moderationVisibleFollowup = "moderation_visible_followup"
     case warningDM = "warning_dm"
 }

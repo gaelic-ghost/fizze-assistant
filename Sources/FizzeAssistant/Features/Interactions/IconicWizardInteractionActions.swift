@@ -207,6 +207,10 @@ extension DiscordInteractionRouter {
             try await warningStore.removeIconicWizardDraft(sessionID: sessionID)
             try await respond(to: interaction, content: ThisIsntIconicWizard.successMessage, ephemeral: true)
 
+        case SongOfTheDayModal.modalID:
+            try ensureStaffAuthorized(member: interaction.member, configuration: configuration)
+            try await handleSOTDModalSubmit(interaction, data: data, configuration: configuration)
+
         default:
             throw UserFacingError("DiscordInteractionRouter.handleModalSubmit: the bot received an unknown modal step `\(customID)`, so it cannot continue the wizard. The most likely cause is an outdated button or modal still open in Discord.")
         }

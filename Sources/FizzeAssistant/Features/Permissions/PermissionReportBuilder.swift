@@ -16,7 +16,7 @@ struct PermissionReportBuilder {
     private static let startupPostingProbeChannels: [ChannelPermissionProbe] = [
         .init(
             label: "manual posting check",
-            id: "1493200053852966952",
+            id: AppConfiguration.song_of_the_day_channel_id,
             isConfiguredFeatureChannel: false,
             reportsSuccessfulSend: true
         ),

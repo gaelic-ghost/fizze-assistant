@@ -30,6 +30,20 @@ func modalInteraction(
     fieldCustomID: String,
     value: String
 ) -> DiscordInteraction {
+    modalInteraction(
+        id: id,
+        customID: customID,
+        memberRoles: memberRoles,
+        fields: [(fieldCustomID, value)]
+    )
+}
+
+func modalInteraction(
+    id: String,
+    customID: String,
+    memberRoles: [String],
+    fields: [(customID: String, value: String)]
+) -> DiscordInteraction {
     DiscordInteraction(
         id: id,
         application_id: "app",
@@ -47,19 +61,19 @@ func modalInteraction(
             custom_id: customID,
             component_type: nil,
             options: nil,
-            components: [
+            components: fields.map { field in
                 DiscordComponent(
                     type: DiscordComponentType.actionRow,
                     components: [
                         DiscordComponent(
                             type: DiscordComponentType.textInput,
                             components: nil,
-                            custom_id: fieldCustomID,
+                            custom_id: field.customID,
                             style: DiscordTextInputStyle.short,
                             label: nil,
                             title: nil,
                             description: nil,
-                            value: value,
+                            value: field.value,
                             url: nil,
                             placeholder: nil,
                             required: nil,
@@ -78,8 +92,8 @@ func modalInteraction(
                     required: nil,
                     min_length: nil,
                     max_length: nil
-                ),
-            ]
+                )
+            }
         )
     )
 }

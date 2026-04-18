@@ -140,4 +140,119 @@ struct MessagingInteractionActionsTests {
         let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
         #expect(callbackPayload.data?.content == "Sent.")
     }
+
+    @Test
+    func sotdCommandOpensComposeModal() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+        let router = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        await router.handle(
+            slashInteraction(
+                id: "interaction-sotd",
+                name: "sotd",
+                memberRoles: ["staff-role"],
+                options: [DiscordInteractionOption(name: "message", type: 3, value: .string("ignored legacy field"), options: nil)]
+            ),
+            guildName: "Guild"
+        )
+
+        let callbackRequest = try #require(stub.requests().last(where: { $0.url?.path == "/api/v10/interactions/interaction-sotd/token-interaction-sotd/callback" }))
+        let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
+        #expect(callbackPayload.type == DiscordInteractionCallbackType.modal)
+        #expect(callbackPayload.data?.custom_id == SongOfTheDayModal.modalID)
+        #expect(callbackPayload.data?.title == "Song of the Day")
+        let firstField = try #require(callbackPayload.data?.components?.first?.components?.first)
+        #expect(firstField.custom_id == SongOfTheDayModal.messageFieldID)
+        #expect(firstField.label == "What message should go at the top?")
+        let secondField = try #require(callbackPayload.data?.components?.dropFirst().first?.components?.first)
+        #expect(secondField.custom_id == SongOfTheDayModal.linksFieldID)
+        #expect(secondField.label == "Which links should go at the bottom?")
+    }
+
+    @Test
+    func sotdModalSubmitPostsComposedMessageAndAcknowledgesSender() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+        let router = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        await router.handle(
+            slashInteraction(
+                id: "interaction-sotd-submit",
+                name: "sotd",
+                memberRoles: ["staff-role"],
+                options: nil
+            ),
+            guildName: "Guild"
+        )
+
+        await router.handle(
+            modalInteraction(
+                id: "interaction-sotd-submit-2",
+                customID: SongOfTheDayModal.modalID,
+                memberRoles: ["staff-role"],
+                fields: [
+                    (SongOfTheDayModal.messageFieldID, "Today is all about CHVRCHES - Clearest Blue"),
+                    (SongOfTheDayModal.linksFieldID, "https://youtu.be/BZyzX4c1vIs\nhttps://open.spotify.com/track/example"),
+                ]
+            ),
+            guildName: "Guild"
+        )
+
+        let requests = stub.requests()
+        let messageRequest = try #require(requests.first(where: { $0.url?.path == "/api/v10/channels/\(AppConfiguration.song_of_the_day_channel_id)/messages" }))
+        let messagePayload = try decodeRequestBody(DiscordMessageCreate.self, from: messageRequest)
+        #expect(messagePayload.content == "Today is all about CHVRCHES - Clearest Blue\n\nhttps://youtu.be/BZyzX4c1vIs\nhttps://open.spotify.com/track/example")
+
+        let callbackRequest = try #require(requests.last(where: { $0.url?.path == "/api/v10/interactions/interaction-sotd-submit-2/token-interaction-sotd-submit-2/callback" }))
+        let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
+        #expect(callbackPayload.data?.content == "Posted to Song of the Day.")
+    }
+
+    @Test
+    func sotdModalSubmitFailureReturnsHumanReadableEphemeralReply() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            if request.url?.path == "/api/v10/channels/\(AppConfiguration.song_of_the_day_channel_id)/messages" {
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 403, httpVersion: nil, headerFields: [:])!,
+                    Data(#"{"message":"Missing Permissions","code":50013}"#.utf8)
+                )
+            }
+
+            return (
+                HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                Data()
+            )
+        }
+        let router = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        await router.handle(
+            modalInteraction(
+                id: "interaction-sotd-error",
+                customID: SongOfTheDayModal.modalID,
+                memberRoles: ["staff-role"],
+                fields: [
+                    (SongOfTheDayModal.messageFieldID, "Broken permissions check"),
+                    (SongOfTheDayModal.linksFieldID, "https://example.com"),
+                ]
+            ),
+            guildName: "Guild"
+        )
+
+        let callbackRequest = try #require(stub.requests().last)
+        let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
+        #expect(callbackPayload.data?.flags == 64)
+        #expect(callbackPayload.data?.content?.contains("Discord responded with HTTP 403") == true)
+    }
 }

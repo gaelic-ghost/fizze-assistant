@@ -19,6 +19,7 @@ struct DiscordCommandRegistrarTests {
         #expect(commandNames.contains("config"))
         #expect(commandNames.contains("arrest"))
         #expect(commandNames.contains("bailout"))
+        #expect(commandNames.contains("sotd"))
 
         let configCommand = registrar.guildCommands.first(where: { $0.name == "config" })
         let subcommandNames = configCommand?.options?.map(\.name) ?? []
@@ -36,6 +37,9 @@ struct DiscordCommandRegistrarTests {
 
         let bailoutCommand = registrar.guildCommands.first(where: { $0.name == "bailout" })
         #expect(bailoutCommand?.options?.first?.name == "user")
+
+        let sotdCommand = registrar.guildCommands.first(where: { $0.name == "sotd" })
+        #expect(sotdCommand?.options == nil)
     }
 
     @Test
