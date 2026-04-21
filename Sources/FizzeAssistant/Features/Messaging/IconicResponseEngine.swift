@@ -1,13 +1,13 @@
 import Foundation
 
-actor TriggerCooldownStore {
+actor ResponseCooldownGate {
     // MARK: Stored Properties
 
     private var fireDates: [String: Date] = [:]
 
     // MARK: Public API
 
-    func canFire(trigger: String, cooldown: TimeInterval, now: Date = Date()) -> Bool {
+    func allowsResponse(for trigger: String, cooldown: TimeInterval, now: Date = Date()) -> Bool {
         let key = trigger.lowercased()
         if let lastDate = fireDates[key], now.timeIntervalSince(lastDate) < cooldown {
             return false
@@ -22,7 +22,7 @@ struct IconicResponseEngine {
     // MARK: Stored Properties
 
     let messagesByTrigger: [String: IconicMessageConfiguration]
-    let cooldownStore: TriggerCooldownStore
+    let cooldownGate: ResponseCooldownGate
     let cooldown: TimeInterval
     let matchingMode: IconicTriggerMatchingMode
 
@@ -36,7 +36,7 @@ struct IconicResponseEngine {
             return nil
         }
 
-        guard await cooldownStore.canFire(trigger: matchedTrigger, cooldown: cooldown) else {
+        guard await cooldownGate.allowsResponse(for: matchedTrigger, cooldown: cooldown) else {
             return nil
         }
 

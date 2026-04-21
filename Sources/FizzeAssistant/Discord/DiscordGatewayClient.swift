@@ -207,6 +207,10 @@ actor DiscordGatewayClient {
             }
             try await sendIdentifyOrResume()
 
+        case DiscordGatewayOpCode.heartbeat:
+            logger.debug("DiscordGatewayClient.handle: Discord requested an immediate heartbeat outside the normal interval, so the bot is replying right away to keep the session healthy.")
+            try await sendHeartbeat()
+
         case DiscordGatewayOpCode.dispatch:
             try await handleDispatch(eventName: envelope.t, payload: envelope.d)
 
@@ -238,11 +242,7 @@ actor DiscordGatewayClient {
                     return
                 }
 
-                awaitingHeartbeatACK = true
-                try await send(payload: [
-                    "op": .number(Double(DiscordGatewayOpCode.heartbeat)),
-                    "d": sequenceNumber.map { .number(Double($0)) } ?? .null,
-                ])
+                try await sendHeartbeat()
 
                 try await sleep(.nanoseconds(heartbeat_interval_nanoseconds))
             } catch is CancellationError {
@@ -296,6 +296,14 @@ actor DiscordGatewayClient {
         try await webSocketTask?.send(.string(text))
     }
 
+    private func sendHeartbeat() async throws {
+        awaitingHeartbeatACK = true
+        try await send(payload: [
+            "op": .number(Double(DiscordGatewayOpCode.heartbeat)),
+            "d": sequenceNumber.map { .number(Double($0)) } ?? .null,
+        ])
+    }
+
     private func handleDispatch(eventName: String?, payload: JSONValue?) async throws {
         switch eventName {
         case "READY":
@@ -307,13 +315,16 @@ actor DiscordGatewayClient {
                 "resume_gateway_url": .string(ready.resume_gateway_url),
             ])
 
+        case "RESUMED":
+            logger.info("DiscordGatewayClient.handleDispatch: Discord accepted the resume request, so the earlier Gateway session is active again without a fresh identify.")
+
         case "GUILD_MEMBER_ADD":
             try await decodeAndForwardDispatch(
                 eventName: "GUILD_MEMBER_ADD",
                 payload: payload,
                 safeToDropOnDecodeFailure: true,
                 decode: { try decodePayload(DiscordGuildMemberAddEvent.self, from: $0) },
-                forward: { await onEvent(.memberJoined($0)) }
+                forward: { await self.onEvent(.memberJoined($0)) }
             )
 
         case "GUILD_MEMBER_REMOVE":
@@ -322,7 +333,7 @@ actor DiscordGatewayClient {
                 payload: payload,
                 safeToDropOnDecodeFailure: true,
                 decode: { try decodePayload(DiscordGuildMemberRemoveEvent.self, from: $0) },
-                forward: { await onEvent(.memberRemoved($0)) }
+                forward: { await self.onEvent(.memberRemoved($0)) }
             )
 
         case "GUILD_BAN_ADD":
@@ -331,7 +342,7 @@ actor DiscordGatewayClient {
                 payload: payload,
                 safeToDropOnDecodeFailure: true,
                 decode: { try decodePayload(DiscordGuildBanAddEvent.self, from: $0) },
-                forward: { await onEvent(.memberBanned($0)) }
+                forward: { await self.onEvent(.memberBanned($0)) }
             )
 
         case "INTERACTION_CREATE":
@@ -340,7 +351,7 @@ actor DiscordGatewayClient {
                 payload: payload,
                 safeToDropOnDecodeFailure: true,
                 decode: { try decodePayload(DiscordInteraction.self, from: $0) },
-                forward: { await onEvent(.interaction($0)) }
+                forward: { await self.onEvent(.interaction($0)) }
             )
 
         case "MESSAGE_CREATE":
@@ -349,7 +360,7 @@ actor DiscordGatewayClient {
                 payload: payload,
                 safeToDropOnDecodeFailure: true,
                 decode: { try decodePayload(DiscordMessageEvent.self, from: $0) },
-                forward: { await onEvent(.message($0)) }
+                forward: { await self.onEvent(.message($0)) }
             )
 
         default:
@@ -357,16 +368,18 @@ actor DiscordGatewayClient {
         }
     }
 
-    private func decodeAndForwardDispatch<EventPayload>(
+    private func decodeAndForwardDispatch<EventPayload: Sendable>(
         eventName: String,
         payload: JSONValue?,
         safeToDropOnDecodeFailure: Bool,
         decode: (JSONValue?) throws -> EventPayload,
-        forward: (EventPayload) async -> Void
+        forward: @escaping @Sendable (EventPayload) async -> Void
     ) async throws {
         do {
             let event = try decode(payload)
-            await forward(event)
+            Task {
+                await forward(event)
+            }
         } catch {
             guard safeToDropOnDecodeFailure else {
                 throw error

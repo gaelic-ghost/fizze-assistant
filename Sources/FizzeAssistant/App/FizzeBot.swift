@@ -52,11 +52,12 @@ actor FizzeBot {
     private let logger: Logger
     private let warningStore: WarningStore
     private let interactionRouter: DiscordInteractionRouter
-    private let cooldownStore = TriggerCooldownStore()
+    private let responseCooldownGate = ResponseCooldownGate()
     private let banCache = ModerationEventCache()
     private let botUserID: String
+    private let guildName: String
+    private let messagePlanner: MessageResponsePlanner
 
-    private var guildName = ""
     private var gatewayClient: DiscordGatewayClient?
 
     // MARK: Lifecycle
@@ -80,6 +81,24 @@ actor FizzeBot {
 
         let guild = try await restClient.getGuild(id: configuration.guild_id)
         self.guildName = guild.name
+        self.messagePlanner = MessageResponsePlanner(
+            planResponse: { [configurationStore, responseCooldownGate, botUserID, guildName] event in
+                await Self.planMessageResponse(
+                    for: event,
+                    configurationStore: configurationStore,
+                    responseCooldownGate: responseCooldownGate,
+                    botUserID: botUserID,
+                    guildName: guildName
+                )
+            },
+            executeResponse: { [restClient, logger] plan in
+                await Self.executeMessageResponsePlan(
+                    plan,
+                    restClient: restClient,
+                    logger: logger
+                )
+            }
+        )
     }
 
     // MARK: Public API
@@ -113,7 +132,12 @@ actor FizzeBot {
     }
 
     func handleEventForTesting(_ event: DiscordGatewayClient.Event) async {
-        await handle(event)
+        switch event {
+        case let .message(message):
+            await messagePlanner.enqueueAndWait(message)
+        default:
+            await handle(event)
+        }
     }
 
     // MARK: Event Handling
@@ -134,7 +158,7 @@ actor FizzeBot {
                 await interactionRouter.handle(interaction, guildName: guildName)
 
             case let .message(message):
-                try await handleMessageCreate(message)
+                await messagePlanner.enqueue(message)
             }
         } catch {
             logger.warning(
@@ -254,36 +278,74 @@ actor FizzeBot {
 
     // MARK: Messaging Helpers
 
-    private func handleMessageCreate(_ event: DiscordMessageEvent) async throws {
+    private static func planMessageResponse(
+        for event: DiscordMessageEvent,
+        configurationStore: ConfigurationStore,
+        responseCooldownGate: ResponseCooldownGate,
+        botUserID: String,
+        guildName: String
+    ) async -> PlannedMessageResponse? {
         let configuration = await configurationStore.currentConfiguration()
-        guard event.guild_id == configuration.guild_id else { return }
-        guard event.webhook_id == nil else { return }
-        guard event.author.id != botUserID else { return }
+        guard event.guild_id == configuration.guild_id else { return nil }
+        guard event.webhook_id == nil else { return nil }
+        guard event.author.id != botUserID else { return nil }
 
         let engine = IconicResponseEngine(
             messagesByTrigger: configuration.iconic_messages,
-            cooldownStore: cooldownStore,
+            cooldownGate: responseCooldownGate,
             cooldown: configuration.trigger_cooldown_seconds,
             matchingMode: configuration.trigger_matching_mode
         )
         if let response = await engine.response(for: event.content) {
-            try await sendIconicMessageResponse(response, for: event)
-            return
+            return PlannedMessageResponse(
+                event: event,
+                action: .iconic(response)
+            )
         }
 
-        guard containsBotMention(in: event.content) else { return }
+        guard containsBotMention(in: event.content, botUserID: botUserID) else { return nil }
         guard
             let template = configuration.bot_mention_responses.randomElement(),
-            await cooldownStore.canFire(trigger: Self.mentionReplyCooldownKey, cooldown: configuration.trigger_cooldown_seconds)
+            await responseCooldownGate.allowsResponse(
+                for: Self.mentionReplyCooldownKey,
+                cooldown: configuration.trigger_cooldown_seconds
+            )
         else {
-            return
+            return nil
         }
 
         let response = TemplateRenderer.render(template, user: event.author, guildName: guildName)
-        try await sendMentionResponse(response, for: event)
+        return PlannedMessageResponse(
+            event: event,
+            action: .mention(response)
+        )
     }
 
-    private func sendIconicMessageResponse(_ response: IconicMessageConfiguration, for event: DiscordMessageEvent) async throws {
+    private static func executeMessageResponsePlan(
+        _ plan: PlannedMessageResponse,
+        restClient: DiscordRESTClient,
+        logger: Logger
+    ) async {
+        do {
+            switch plan.action {
+            case let .iconic(response):
+                try await sendIconicMessageResponse(response, for: plan.event, restClient: restClient)
+            case let .mention(response):
+                try await sendMentionResponse(response, for: plan.event, restClient: restClient)
+            }
+        } catch {
+            logger.warning(
+                "FizzeBot.executeMessageResponsePlan: one planned Discord message reply did not finish cleanly, but the message response lane is staying online for later events.",
+                metadata: ["error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error))]
+            )
+        }
+    }
+
+    private static func sendIconicMessageResponse(
+        _ response: IconicMessageConfiguration,
+        for event: DiscordMessageEvent,
+        restClient: DiscordRESTClient
+    ) async throws {
         do {
             try await restClient.createManagedMessage(
                 channel_id: event.channel_id,
@@ -300,7 +362,11 @@ actor FizzeBot {
         }
     }
 
-    private func sendMentionResponse(_ response: String, for event: DiscordMessageEvent) async throws {
+    private static func sendMentionResponse(
+        _ response: String,
+        for event: DiscordMessageEvent,
+        restClient: DiscordRESTClient
+    ) async throws {
         do {
             try await restClient.createManagedMessage(
                 channel_id: event.channel_id,
@@ -317,7 +383,81 @@ actor FizzeBot {
         }
     }
 
-    private func containsBotMention(in content: String) -> Bool {
+    private static func containsBotMention(in content: String, botUserID: String) -> Bool {
         content.contains("<@\(botUserID)>") || content.contains("<@!\(botUserID)>")
+    }
+}
+
+private struct PlannedMessageResponse: Sendable {
+    enum Action: Sendable {
+        case iconic(IconicMessageConfiguration)
+        case mention(String)
+    }
+
+    let event: DiscordMessageEvent
+    let action: Action
+}
+
+private actor MessageResponsePlanner {
+    private struct QueuedMessage {
+        let event: DiscordMessageEvent
+        let completion: CheckedContinuation<Void, Never>?
+    }
+
+    private let planResponse: @Sendable (DiscordMessageEvent) async -> PlannedMessageResponse?
+    private let executeResponse: @Sendable (PlannedMessageResponse) async -> Void
+
+    private var queuedMessages: [QueuedMessage] = []
+    private var isPlanningMessage = false
+
+    init(
+        planResponse: @escaping @Sendable (DiscordMessageEvent) async -> PlannedMessageResponse?,
+        executeResponse: @escaping @Sendable (PlannedMessageResponse) async -> Void
+    ) {
+        self.planResponse = planResponse
+        self.executeResponse = executeResponse
+    }
+
+    func enqueue(_ event: DiscordMessageEvent) {
+        queuedMessages.append(QueuedMessage(event: event, completion: nil))
+        scheduleIfNeeded()
+    }
+
+    func enqueueAndWait(_ event: DiscordMessageEvent) async {
+        await withCheckedContinuation { continuation in
+            queuedMessages.append(QueuedMessage(event: event, completion: continuation))
+            scheduleIfNeeded()
+        }
+    }
+
+    private func scheduleIfNeeded() {
+        guard !isPlanningMessage, !queuedMessages.isEmpty else { return }
+        let queuedMessage = queuedMessages.removeFirst()
+        isPlanningMessage = true
+
+        Task { [planResponse, executeResponse] in
+            let plannedResponse = await planResponse(queuedMessage.event)
+
+            if let completion = queuedMessage.completion {
+                if let plannedResponse {
+                    await executeResponse(plannedResponse)
+                }
+                completion.resume()
+                await self.finishPlanning()
+                return
+            }
+
+            await self.finishPlanning()
+
+            guard let plannedResponse else { return }
+            Task {
+                await executeResponse(plannedResponse)
+            }
+        }
+    }
+
+    private func finishPlanning() async {
+        isPlanningMessage = false
+        scheduleIfNeeded()
     }
 }

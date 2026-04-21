@@ -33,9 +33,14 @@ struct MessagingInteractionActionsTests {
         let messagePayload = try decodeRequestBody(DiscordMessageCreate.self, from: messageRequest)
         #expect(messagePayload.content == "hello from fizze")
 
-        let callbackRequest = try #require(requests.last(where: { $0.url?.path == "/api/v10/interactions/interaction-say/token-interaction-say/callback" }))
+        let callbackRequest = try #require(requests.first(where: { $0.url?.path == "/api/v10/interactions/interaction-say/token-interaction-say/callback" }))
         let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
-        #expect(callbackPayload.data?.content == "Sent.")
+        #expect(callbackPayload.type == DiscordInteractionCallbackType.deferredChannelMessageWithSource)
+        #expect(callbackPayload.data?.flags == 64)
+
+        let completionRequest = try #require(requests.last(where: { $0.url?.path == "/api/v10/webhooks/app/token-interaction-say/messages/@original" }))
+        let completionPayload = try decodeRequestBody(DiscordMessageCreate.self, from: completionRequest)
+        #expect(completionPayload.content == "Sent.")
     }
 
     @Test
@@ -70,12 +75,16 @@ struct MessagingInteractionActionsTests {
         )
 
         let requests = stub.requests()
-        #expect(requests.count == 2)
+        #expect(requests.count == 3)
 
-        let callbackRequest = try #require(requests.last)
+        let callbackRequest = try #require(requests.first(where: { $0.url?.path == "/api/v10/interactions/interaction-say-error/token-interaction-say-error/callback" }))
         let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
         #expect(callbackPayload.data?.flags == 64)
-        #expect(callbackPayload.data?.content?.contains("Discord responded with HTTP 403") == true)
+        #expect(callbackPayload.type == DiscordInteractionCallbackType.deferredChannelMessageWithSource)
+
+        let completionRequest = try #require(requests.last(where: { $0.url?.path == "/api/v10/webhooks/app/token-interaction-say-error/messages/@original" }))
+        let completionPayload = try decodeRequestBody(DiscordMessageCreate.self, from: completionRequest)
+        #expect(completionPayload.content?.contains("Discord responded with HTTP 403") == true)
     }
 
     @Test
@@ -136,9 +145,70 @@ struct MessagingInteractionActionsTests {
 
         #expect(postAttempts == 2)
         let requests = stub.requests()
-        let callbackRequest = try #require(requests.last(where: { $0.url?.path == "/api/v10/interactions/interaction-say-retry/token-interaction-say-retry/callback" }))
+        let callbackRequest = try #require(requests.first(where: { $0.url?.path == "/api/v10/interactions/interaction-say-retry/token-interaction-say-retry/callback" }))
         let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
-        #expect(callbackPayload.data?.content == "Sent.")
+        #expect(callbackPayload.type == DiscordInteractionCallbackType.deferredChannelMessageWithSource)
+        #expect(callbackPayload.data?.flags == 64)
+
+        let completionRequest = try #require(requests.last(where: { $0.url?.path == "/api/v10/webhooks/app/token-interaction-say-retry/messages/@original" }))
+        let completionPayload = try decodeRequestBody(DiscordMessageCreate.self, from: completionRequest)
+        #expect(completionPayload.content == "Sent.")
+    }
+
+    @Test
+    func sayCommandDefersBeforeSlowVisiblePostFinishes() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let firstPostStarted = DispatchSemaphore(value: 0)
+        let releasePost = DispatchSemaphore(value: 0)
+        let interactionDeferred = DispatchSemaphore(value: 0)
+        let stub = makeDiscordRESTClient { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("POST", "/api/v10/channels/target-channel/messages"):
+                firstPostStarted.signal()
+                _ = releasePost.wait(timeout: .now() + 1)
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+
+            case ("POST", "/api/v10/interactions/interaction-say-slow/token-interaction-say-slow/callback"):
+                interactionDeferred.signal()
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+
+            default:
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+            }
+        }
+        let router = try await makeRouter(rootURL: rootURL, restClient: stub.client)
+
+        Task {
+            await router.handle(
+                slashInteraction(
+                    id: "interaction-say-slow",
+                    name: "say",
+                    memberRoles: ["staff-role"],
+                    options: [
+                        DiscordInteractionOption(name: "channel", type: 7, value: .string("target-channel"), options: nil),
+                        DiscordInteractionOption(name: "message", type: 3, value: .string("hello from fizze"), options: nil),
+                    ]
+                ),
+                guildName: "Guild"
+            )
+        }
+
+        let postDidStart = waitForSemaphore(firstPostStarted, timeout: .now() + 1)
+        #expect(postDidStart)
+
+        let interactionDidDefer = waitForSemaphore(interactionDeferred, timeout: .now() + 1)
+        #expect(interactionDidDefer)
+
+        releasePost.signal()
     }
 
     @Test
@@ -214,9 +284,14 @@ struct MessagingInteractionActionsTests {
         let messagePayload = try decodeRequestBody(DiscordMessageCreate.self, from: messageRequest)
         #expect(messagePayload.content == "Today is all about CHVRCHES - Clearest Blue\n\nhttps://youtu.be/BZyzX4c1vIs\nhttps://open.spotify.com/track/example")
 
-        let callbackRequest = try #require(requests.last(where: { $0.url?.path == "/api/v10/interactions/interaction-sotd-submit-2/token-interaction-sotd-submit-2/callback" }))
+        let callbackRequest = try #require(requests.first(where: { $0.url?.path == "/api/v10/interactions/interaction-sotd-submit-2/token-interaction-sotd-submit-2/callback" }))
         let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
-        #expect(callbackPayload.data?.content == "Posted to Song of the Day.")
+        #expect(callbackPayload.type == DiscordInteractionCallbackType.deferredChannelMessageWithSource)
+        #expect(callbackPayload.data?.flags == 64)
+
+        let completionRequest = try #require(requests.last(where: { $0.url?.path == "/api/v10/webhooks/app/token-interaction-sotd-submit-2/messages/@original" }))
+        let completionPayload = try decodeRequestBody(DiscordMessageCreate.self, from: completionRequest)
+        #expect(completionPayload.content == "Posted to Song of the Day.")
     }
 
     @Test
@@ -250,9 +325,13 @@ struct MessagingInteractionActionsTests {
             guildName: "Guild"
         )
 
-        let callbackRequest = try #require(stub.requests().last)
+        let callbackRequest = try #require(stub.requests().first(where: { $0.url?.path == "/api/v10/interactions/interaction-sotd-error/token-interaction-sotd-error/callback" }))
         let callbackPayload = try decodeRequestBody(InteractionCallbackPayload.self, from: callbackRequest)
         #expect(callbackPayload.data?.flags == 64)
-        #expect(callbackPayload.data?.content?.contains("Discord responded with HTTP 403") == true)
+        #expect(callbackPayload.type == DiscordInteractionCallbackType.deferredChannelMessageWithSource)
+
+        let completionRequest = try #require(stub.requests().last(where: { $0.url?.path == "/api/v10/webhooks/app/token-interaction-sotd-error/messages/@original" }))
+        let completionPayload = try decodeRequestBody(DiscordMessageCreate.self, from: completionRequest)
+        #expect(completionPayload.content?.contains("Discord responded with HTTP 403") == true)
     }
 }

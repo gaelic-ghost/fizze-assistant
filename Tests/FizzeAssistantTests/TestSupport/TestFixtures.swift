@@ -3,6 +3,10 @@ import Logging
 import Testing
 @testable import FizzeAssistant
 
+func waitForSemaphore(_ semaphore: DispatchSemaphore, timeout: DispatchTime) -> Bool {
+    semaphore.wait(timeout: timeout) == .success
+}
+
 func makeTemporaryTestDirectory() throws -> URL {
     let rootURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)

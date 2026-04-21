@@ -351,4 +351,94 @@ struct DiscordGatewayClientTests {
 
         await client.stop()
     }
+
+    @Test
+    func heartbeatRequestTriggersImmediateHeartbeat() async throws {
+        let socket = StubDiscordGatewaySocket(receiveSteps: [
+            .message(gatewayMessage("""
+            {"op":10,"d":{"heartbeat_interval":60000},"s":null,"t":null}
+            """)),
+            .message(gatewayMessage("""
+            {"op":1,"d":null,"s":7,"t":null}
+            """)),
+        ])
+        let factory = StubDiscordGatewaySocketFactory(sockets: [socket])
+        let client = DiscordGatewayClient(
+            token: "token",
+            gatewayURL: URL(string: "wss://gateway.discord.gg?v=10&encoding=json")!,
+            intents: 513,
+            logger: .init(label: "test"),
+            makeSocket: { url in
+                factory.makeSocket(url: url)
+            },
+            sleep: { duration in
+                try await Task.sleep(for: duration)
+            },
+            reconnectDelayProvider: { _ in 0 },
+            onEvent: { _ in }
+        )
+
+        try await client.start()
+
+        try await eventually {
+            let payloads = try await socket.sentPayloadObjects()
+            return payloads.contains { gatewayOpcode($0["op"]) == DiscordGatewayOpCode.heartbeat }
+        }
+
+        let payloads = try await socket.sentPayloadObjects()
+        #expect(payloads.contains(where: { gatewayOpcode($0["op"]) == DiscordGatewayOpCode.identify }))
+        #expect(payloads.contains(where: { gatewayOpcode($0["op"]) == DiscordGatewayOpCode.heartbeat }))
+
+        await client.stop()
+    }
+
+    @Test
+    func slowEventHandlerDoesNotBlockLaterGatewayFrames() async throws {
+        let socket = StubDiscordGatewaySocket(receiveSteps: [
+            .message(gatewayMessage("""
+            {"op":10,"d":{"heartbeat_interval":60000},"s":null,"t":null}
+            """)),
+            .message(gatewayMessage("""
+            {"op":0,"d":{"id":"message-1","channel_id":"channel-1","guild_id":"guild-1","content":"first","author":{"id":"user-1","username":"gale","global_name":"Gale"}},"s":2,"t":"MESSAGE_CREATE"}
+            """)),
+            .message(gatewayMessage("""
+            {"op":0,"d":{"id":"message-2","channel_id":"channel-1","guild_id":"guild-1","content":"second","author":{"id":"user-2","username":"gale","global_name":"Gale"}},"s":3,"t":"MESSAGE_CREATE"}
+            """)),
+            .message(gatewayMessage("""
+            {"op":11,"d":null,"s":null,"t":null}
+            """)),
+        ])
+        let factory = StubDiscordGatewaySocketFactory(sockets: [socket])
+        let recorder = GatewayEventRecorder()
+        let gate = AsyncGate()
+        let client = DiscordGatewayClient(
+            token: "token",
+            gatewayURL: URL(string: "wss://gateway.discord.gg?v=10&encoding=json")!,
+            intents: 513,
+            logger: .init(label: "test"),
+            makeSocket: { url in
+                factory.makeSocket(url: url)
+            },
+            sleep: { duration in
+                try await Task.sleep(for: duration)
+            },
+            reconnectDelayProvider: { _ in 0 },
+            onEvent: { event in
+                await recorder.append(event)
+                await gate.wait()
+            }
+        )
+
+        try await client.start()
+
+        try await eventually {
+            await recorder.snapshot().count == 2
+        }
+
+        let events = await recorder.snapshot()
+        #expect(events.count == 2)
+        await gate.open()
+
+        await client.stop()
+    }
 }

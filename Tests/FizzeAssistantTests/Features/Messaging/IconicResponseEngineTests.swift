@@ -11,7 +11,7 @@ struct IconicResponseEngineTests {
             messagesByTrigger: [
                 "fizze time": IconicMessageConfiguration(content: "sparkle", embeds: nil),
             ],
-            cooldownStore: TriggerCooldownStore(),
+            cooldownGate: ResponseCooldownGate(),
             cooldown: 30,
             matchingMode: .exact
         )
@@ -22,12 +22,12 @@ struct IconicResponseEngineTests {
 
     @Test
     func cooldownBlocksSecondImmediateResponse() async {
-        let store = TriggerCooldownStore()
+        let store = ResponseCooldownGate()
         let engine = IconicResponseEngine(
             messagesByTrigger: [
                 "fizze time": IconicMessageConfiguration(content: "sparkle", embeds: nil),
             ],
-            cooldownStore: store,
+            cooldownGate: store,
             cooldown: 30,
             matchingMode: .exact
         )
@@ -56,7 +56,7 @@ struct IconicResponseEngineTests {
                     ]
                 ),
             ],
-            cooldownStore: TriggerCooldownStore(),
+            cooldownGate: ResponseCooldownGate(),
             cooldown: 30,
             matchingMode: .exact
         )
@@ -73,7 +73,7 @@ struct IconicResponseEngineTests {
                 "fizze": IconicMessageConfiguration(content: "base", embeds: nil),
                 "fizze time": IconicMessageConfiguration(content: "longest", embeds: nil),
             ],
-            cooldownStore: TriggerCooldownStore(),
+            cooldownGate: ResponseCooldownGate(),
             cooldown: 30,
             matchingMode: .fuzze
         )

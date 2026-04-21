@@ -13,6 +13,7 @@ struct DiscordRESTClient {
     private let rateLimitCoordinator: DiscordRateLimitCoordinator
     private let invalidRequestTracker: DiscordInvalidRequestTracker
     private let messageDeliveryCoordinator: DiscordMessageDeliveryCoordinator
+    private let managedMessageLaneCoordinator: ManagedMessageLaneCoordinator
     private let identityCache: DiscordBotIdentityCache
     private let maxRetryAttempts = 5
     private let requestTimeoutSeconds: TimeInterval = 15
@@ -40,6 +41,7 @@ struct DiscordRESTClient {
         self.rateLimitCoordinator = DiscordRateLimitCoordinator()
         self.invalidRequestTracker = DiscordInvalidRequestTracker()
         self.messageDeliveryCoordinator = DiscordMessageDeliveryCoordinator()
+        self.managedMessageLaneCoordinator = ManagedMessageLaneCoordinator()
         self.identityCache = DiscordBotIdentityCache()
     }
 
@@ -110,47 +112,49 @@ struct DiscordRESTClient {
         kind: ManagedDiscordMessageKind,
         logicalTargetID: String?
     ) async throws {
-        let delivery = ManagedDiscordMessageDelivery(
-            kind: kind,
-            channelID: channel_id,
-            payload: payload,
-            logicalTargetID: logicalTargetID
-        )
+        try await managedMessageLaneCoordinator.enqueue(channelID: channel_id) {
+            let delivery = ManagedDiscordMessageDelivery(
+                kind: kind,
+                channelID: channel_id,
+                payload: payload,
+                logicalTargetID: logicalTargetID
+            )
 
-        guard await messageDeliveryCoordinator.shouldSend(delivery) else {
-            logger.info("DiscordRESTClient.createManagedMessage: skipping a duplicate bot-authored channel message because the same delivery key was already completed recently.", metadata: [
-                "channel_id": .string(channel_id),
-                "delivery_kind": .string(kind.rawValue),
-            ])
-            return
-        }
-
-        do {
-            try await createMessage(channel_id: channel_id, payload: payload)
-            await messageDeliveryCoordinator.recordDelivered(delivery)
-            return
-        } catch {
-            guard shouldRecoverManagedMessageSend(error) else {
-                throw error
-            }
-
-            logger.warning("DiscordRESTClient.createManagedMessage: the channel message send ended in an unknown state, so the bot is checking recent Discord history before deciding whether to retry.", metadata: [
-                "channel_id": .string(channel_id),
-                "delivery_kind": .string(kind.rawValue),
-                "error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error)),
-            ])
-
-            if try await recentChannelMessagesContainManagedDelivery(delivery) {
-                await messageDeliveryCoordinator.recordDelivered(delivery)
+            guard await messageDeliveryCoordinator.shouldSend(delivery) else {
+                logger.info("DiscordRESTClient.createManagedMessage: skipping a duplicate bot-authored channel message because the same delivery key was already completed recently.", metadata: [
+                    "channel_id": .string(channel_id),
+                    "delivery_kind": .string(kind.rawValue),
+                ])
                 return
             }
 
-            guard await messageDeliveryCoordinator.shouldRetryAfterUnknownOutcome(delivery) else {
-                throw error
-            }
+            do {
+                try await createMessage(channel_id: channel_id, payload: payload)
+                await messageDeliveryCoordinator.recordDelivered(delivery)
+                return
+            } catch {
+                guard shouldRecoverManagedMessageSend(error) else {
+                    throw error
+                }
 
-            try await createMessage(channel_id: channel_id, payload: payload)
-            await messageDeliveryCoordinator.recordDelivered(delivery)
+                logger.warning("DiscordRESTClient.createManagedMessage: the channel message send ended in an unknown state, so the bot is checking recent Discord history before deciding whether to retry.", metadata: [
+                    "channel_id": .string(channel_id),
+                    "delivery_kind": .string(kind.rawValue),
+                    "error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error)),
+                ])
+
+                if try await recentChannelMessagesContainManagedDelivery(delivery) {
+                    await messageDeliveryCoordinator.recordDelivered(delivery)
+                    return
+                }
+
+                guard await messageDeliveryCoordinator.shouldRetryAfterUnknownOutcome(delivery) else {
+                    throw error
+                }
+
+                try await createMessage(channel_id: channel_id, payload: payload)
+                await messageDeliveryCoordinator.recordDelivered(delivery)
+            }
         }
     }
 
@@ -711,6 +715,56 @@ private actor DiscordMessageDeliveryCoordinator {
         let now = Date()
         deliveredUntilByDelivery = deliveredUntilByDelivery.filter { $0.value > now }
         retryUsedUntilByDelivery = retryUsedUntilByDelivery.filter { $0.value > now }
+    }
+}
+
+private actor ManagedMessageLaneCoordinator {
+    private struct PendingSend {
+        let operation: @Sendable () async throws -> Void
+        let continuation: CheckedContinuation<Void, Error>
+    }
+
+    private var pendingSendsByChannel: [DiscordSnowflake: [PendingSend]] = [:]
+    private var activeChannels: Set<DiscordSnowflake> = []
+
+    func enqueue(
+        channelID: DiscordSnowflake,
+        operation: @escaping @Sendable () async throws -> Void
+    ) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            pendingSendsByChannel[channelID, default: []].append(
+                PendingSend(operation: operation, continuation: continuation)
+            )
+            if activeChannels.insert(channelID).inserted {
+                scheduleNext(for: channelID)
+            }
+        }
+    }
+
+    private func scheduleNext(for channelID: DiscordSnowflake) {
+        guard var pendingSends = pendingSendsByChannel[channelID], !pendingSends.isEmpty else {
+            pendingSendsByChannel[channelID] = nil
+            activeChannels.remove(channelID)
+            return
+        }
+
+        let nextSend = pendingSends.removeFirst()
+        pendingSendsByChannel[channelID] = pendingSends
+
+        Task {
+            do {
+                try await nextSend.operation()
+                nextSend.continuation.resume()
+            } catch {
+                nextSend.continuation.resume(throwing: error)
+            }
+
+            await self.finishSend(for: channelID)
+        }
+    }
+
+    private func finishSend(for channelID: DiscordSnowflake) async {
+        scheduleNext(for: channelID)
     }
 }
 

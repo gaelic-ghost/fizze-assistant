@@ -388,6 +388,83 @@ struct FizzeBotTests {
         #expect(payload.content == "sparkle")
     }
 
+    @Test
+    func slowMessageBurstDoesNotBlockInteractionAcknowledgement() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let firstMessageStarted = DispatchSemaphore(value: 0)
+        let releaseFirstMessage = DispatchSemaphore(value: 0)
+        let interactionAcknowledged = DispatchSemaphore(value: 0)
+        let stub = makeDiscordRESTClient { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("POST", "/api/v10/channels/source-channel/messages"):
+                firstMessageStarted.signal()
+                _ = releaseFirstMessage.wait(timeout: .now() + 1)
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+
+            case ("POST", "/api/v10/interactions/interaction-queue-1/token-interaction-queue-1/callback"):
+                interactionAcknowledged.signal()
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+
+            default:
+                return try stubBotRequest(request)
+            }
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.iconic_messages = [
+                    "fizze time": IconicMessageConfiguration(content: "sparkle", embeds: nil),
+                ]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        Task {
+            await bot.handleEventForTesting(
+                .message(
+                    DiscordMessageEvent(
+                        id: "message-queued-1",
+                        channel_id: "source-channel",
+                        guild_id: "guild",
+                        content: "FIZZE TIME",
+                        author: DiscordUser(id: "friend-9", username: "friend", global_name: "Friend"),
+                        webhook_id: nil
+                    )
+                )
+            )
+        }
+
+        let firstMessageDidStart = waitForSemaphore(firstMessageStarted, timeout: .now() + 1)
+        #expect(firstMessageDidStart)
+
+        await bot.handleEventForTesting(
+            .interaction(
+                slashInteraction(
+                    id: "interaction-queue-1",
+                    name: "this-is-iconic",
+                    memberRoles: ["config-role"]
+                )
+            )
+        )
+
+        let interactionDidAcknowledge = waitForSemaphore(interactionAcknowledged, timeout: .now() + 1)
+        #expect(interactionDidAcknowledge)
+
+        releaseFirstMessage.signal()
+
+        try await eventually {
+            return stub.requests().contains { $0.url?.path == "/api/v10/interactions/interaction-queue-1/token-interaction-queue-1/callback" }
+        }
+    }
+
     // MARK: Helpers
 
     private func stubBotRequest(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {

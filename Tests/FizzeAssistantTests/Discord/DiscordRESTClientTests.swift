@@ -516,4 +516,101 @@ struct DiscordRESTClientTests {
             "/api/v10/channels/channel-1/messages",
         ])
     }
+
+    @Test
+    func managedChannelMessagesStaySerializedPerChannelUnderConcurrentBurst() async throws {
+        final class PostState: @unchecked Sendable {
+            private let lock = NSLock()
+            private var postAttempts = 0
+            private var overlappingPostDetected = false
+            private var firstPostInFlight = false
+
+            func beginPost() -> Int {
+                lock.lock()
+                defer { lock.unlock() }
+                postAttempts += 1
+                let currentAttempt = postAttempts
+                if firstPostInFlight {
+                    overlappingPostDetected = true
+                }
+                if currentAttempt == 1 {
+                    firstPostInFlight = true
+                }
+                return currentAttempt
+            }
+
+            func finishFirstPost() {
+                lock.lock()
+                defer { lock.unlock() }
+                firstPostInFlight = false
+            }
+
+            func snapshot() -> (attempts: Int, overlapDetected: Bool) {
+                lock.lock()
+                defer { lock.unlock() }
+                return (postAttempts, overlappingPostDetected)
+            }
+        }
+
+        let firstPostStarted = DispatchSemaphore(value: 0)
+        let releaseFirstPost = DispatchSemaphore(value: 0)
+        let postState = PostState()
+        let stub = makeDiscordRESTClient { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("POST", "/api/v10/channels/channel-1/messages"):
+                let currentAttempt = postState.beginPost()
+
+                if currentAttempt == 1 {
+                    firstPostStarted.signal()
+                    _ = releaseFirstPost.wait(timeout: .now() + 1)
+                    postState.finishFirstPost()
+                }
+
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 200, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+
+            default:
+                Issue.record("Unexpected request in managed lane serialization test: \(request.httpMethod ?? "<nil>") \(request.url?.path ?? "<nil>")")
+                return (
+                    HTTPURLResponse(url: try #require(request.url), statusCode: 500, httpVersion: nil, headerFields: [:])!,
+                    Data()
+                )
+            }
+        }
+
+        async let firstSend: Void = stub.client.createManagedMessage(
+            channel_id: "channel-1",
+            payload: DiscordMessageCreate(content: "first", embeds: nil, components: nil, flags: nil),
+            kind: .iconicReply,
+            logicalTargetID: "source-message-1"
+        )
+
+        let firstPostDidStart = waitForSemaphore(firstPostStarted, timeout: .now() + 1)
+        #expect(firstPostDidStart)
+
+        async let secondSend: Void = stub.client.createManagedMessage(
+            channel_id: "channel-1",
+            payload: DiscordMessageCreate(content: "second", embeds: nil, components: nil, flags: nil),
+            kind: .iconicReply,
+            logicalTargetID: "source-message-2"
+        )
+
+        try await Task.sleep(for: .milliseconds(100))
+
+        let beforeReleaseSnapshot = postState.snapshot()
+
+        #expect(beforeReleaseSnapshot.attempts == 1)
+        #expect(beforeReleaseSnapshot.overlapDetected == false)
+
+        releaseFirstPost.signal()
+
+        _ = try await (firstSend, secondSend)
+
+        let finalSnapshot = postState.snapshot()
+
+        #expect(finalSnapshot.attempts == 2)
+        #expect(finalSnapshot.overlapDetected == false)
+    }
 }

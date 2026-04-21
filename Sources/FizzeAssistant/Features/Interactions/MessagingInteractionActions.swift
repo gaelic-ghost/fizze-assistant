@@ -86,13 +86,42 @@ extension DiscordInteractionRouter {
         kind: ManagedDiscordMessageKind,
         successMessage: String
     ) async throws {
-        try await restClient.createManagedMessage(
-            channel_id: channelID,
-            payload: DiscordMessageCreate(content: message, embeds: nil, components: nil, flags: nil),
-            kind: kind,
-            logicalTargetID: interaction.id
-        )
-        try await respond(to: interaction, content: successMessage, ephemeral: true)
+        try await deferResponse(to: interaction, ephemeral: true)
+
+        do {
+            try await restClient.createManagedMessage(
+                channel_id: channelID,
+                payload: DiscordMessageCreate(content: message, embeds: nil, components: nil, flags: nil),
+                kind: kind,
+                logicalTargetID: interaction.id
+            )
+        } catch {
+            logger.warning("DiscordInteractionRouter.postMessage: the deferred messaging command could not finish its channel post, so the bot is editing the private response with the error details.", metadata: [
+                "channel_id": .string(channelID),
+                "delivery_kind": .string(kind.rawValue),
+                "error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error)),
+            ])
+            try? await completeDeferredEphemeralResponse(
+                to: interaction,
+                content: (error as? LocalizedError)?.errorDescription ?? String(describing: error),
+                failureContext: "DiscordInteractionRouter.postMessage"
+            )
+            return
+        }
+
+        do {
+            try await completeDeferredEphemeralResponse(
+                to: interaction,
+                content: successMessage,
+                failureContext: "DiscordInteractionRouter.postMessage"
+            )
+        } catch {
+            logger.warning("DiscordInteractionRouter.postMessage: the channel post succeeded, but the deferred private acknowledgement could not be completed cleanly.", metadata: [
+                "channel_id": .string(channelID),
+                "delivery_kind": .string(kind.rawValue),
+                "error": .string((error as? LocalizedError)?.errorDescription ?? String(describing: error)),
+            ])
+        }
     }
 
     private func modalParagraphInputRow(

@@ -263,3 +263,18 @@ Definition of done for this testing pass:
 - [ ] Add richer iconic authoring controls if the server wants more than the current text-plus-first-image flow.
 - [ ] Add optional command-registration diffing or clearer idempotency messaging during startup.
 - [ ] Add a simple health/status helper command for SSH operators if routine maintenance starts to feel opaque.
+
+## Queue And Throughput Follow-ups
+
+Scope:
+
+- [ ] Keep Discord burst traffic from turning into avoidable latency without overbuilding the bot.
+- [ ] Separate latency-sensitive interaction work from bulk message-trigger traffic.
+- [ ] Smooth outbound managed replies before Discord rate limits need to teach the client the hard way.
+
+Tickets:
+
+- [ ] Add a dedicated inbound `MESSAGE_CREATE` processing lane so rapid message bursts do not queue behind member lifecycle work or interaction handling on the main bot actor.
+- [ ] Add per-channel outbound managed-message send lanes so iconic replies, mention replies, and other bot-authored channel posts stay ordered and smoother under burst traffic.
+- [ ] Change `/say` and `/sotd` to acknowledge or defer the interaction before the channel post, so slow outbound delivery does not consume the interaction response window first.
+- [ ] Move leave-reason classification off the shared event lane, or otherwise reduce its audit-log lookup impact, so member-removal bursts do not stall unrelated bot work.
