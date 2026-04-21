@@ -1,20 +1,58 @@
 import Foundation
 
 actor ResponseCooldownGate {
+    enum MentionBurstDecision {
+        case sendStandardReply
+        case sendCooldownNotice
+        case suppress
+    }
+
     // MARK: Stored Properties
 
-    private var fireDates: [String: Date] = [:]
+    private var fireDates: [String: [Date]] = [:]
 
     // MARK: Public API
 
     func allowsResponse(for trigger: String, cooldown: TimeInterval, now: Date = Date()) -> Bool {
         let key = trigger.lowercased()
-        if let lastDate = fireDates[key], now.timeIntervalSince(lastDate) < cooldown {
+        let recentDates = prunedDates(for: key, cooldown: cooldown, now: now)
+        guard recentDates.isEmpty else {
             return false
         }
 
-        fireDates[key] = now
+        fireDates[key] = [now]
         return true
+    }
+
+    func mentionBurstDecision(
+        for key: String,
+        cooldown: TimeInterval,
+        now: Date = Date()
+    ) -> MentionBurstDecision {
+        let normalizedKey = key.lowercased()
+        let recentDates = prunedDates(for: normalizedKey, cooldown: cooldown, now: now)
+
+        switch recentDates.count {
+        case 0, 1:
+            fireDates[normalizedKey] = recentDates + [now]
+            return .sendStandardReply
+        case 2:
+            fireDates[normalizedKey] = recentDates + [now]
+            return .sendCooldownNotice
+        default:
+            fireDates[normalizedKey] = recentDates
+            return .suppress
+        }
+    }
+
+    // MARK: Private Helpers
+
+    private func prunedDates(for key: String, cooldown: TimeInterval, now: Date) -> [Date] {
+        let normalizedKey = key.lowercased()
+        let dates = fireDates[normalizedKey] ?? []
+        let recentDates = dates.filter { now.timeIntervalSince($0) < cooldown }
+        fireDates[normalizedKey] = recentDates
+        return recentDates
     }
 }
 
@@ -28,7 +66,7 @@ struct IconicResponseEngine {
 
     // MARK: Public API
 
-    func response(for content: String) async -> IconicMessageConfiguration? {
+    func matchedResponse(for content: String) -> (trigger: String, response: IconicMessageConfiguration)? {
         let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard let matchedTrigger = matchingTrigger(for: normalized),
               let match = messagesByTrigger[matchedTrigger]
@@ -36,11 +74,24 @@ struct IconicResponseEngine {
             return nil
         }
 
-        guard await cooldownGate.allowsResponse(for: matchedTrigger, cooldown: cooldown) else {
+        return (matchedTrigger, match)
+    }
+
+    func response(
+        for content: String,
+        cooldownKey: String? = nil
+    ) async -> IconicMessageConfiguration? {
+        guard let matched = matchedResponse(for: content)
+        else {
             return nil
         }
 
-        return match
+        let effectiveCooldownKey = cooldownKey ?? matched.trigger
+        guard await cooldownGate.allowsResponse(for: effectiveCooldownKey, cooldown: cooldown) else {
+            return nil
+        }
+
+        return matched.response
     }
 
     // MARK: Private Helpers

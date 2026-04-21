@@ -117,7 +117,7 @@ struct FizzeBotTests {
     }
 
     @Test
-    func mentionCooldownSuppressesSecondImmediateReply() async throws {
+    func mentionBurstAllowsTwoRepliesThenCooldownNoticeThenSuppressesFourth() async throws {
         let rootURL = try makeTemporaryTestDirectory()
         let stub = makeDiscordRESTClient { request in
             try stubBotRequest(request)
@@ -151,14 +151,96 @@ struct FizzeBotTests {
                     channel_id: "source-channel",
                     guild_id: "guild",
                     content: "hello again <@bot-user>",
-                    author: DiscordUser(id: "friend-5", username: "friend", global_name: "Friend"),
+                    author: DiscordUser(id: "friend-4", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-5",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "one more <@bot-user>",
+                    author: DiscordUser(id: "friend-4", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-6",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "seriously <@bot-user>",
+                    author: DiscordUser(id: "friend-4", username: "friend", global_name: "Friend"),
                     webhook_id: nil
                 )
             )
         )
 
         let messageRequests = stub.requests().filter { $0.url?.path == "/api/v10/channels/source-channel/messages" }
-        #expect(messageRequests.count == 1)
+        #expect(messageRequests.count == 3)
+
+        let payloads = try messageRequests.map { try decodeRequestBody(DiscordMessageCreate.self, from: $0) }
+        #expect(payloads[0].content == "hello <@friend-4>")
+        #expect(payloads[1].content == "hello <@friend-4>")
+        #expect([
+            "Whoa, whoa, slow down there. I'll give you time to catch your breath...",
+            "*turns down the thermostat*\nCooldown mode initiated...",
+            "*backs away slowly, startled by all the pings*",
+        ].contains(payloads[2].content ?? ""))
+    }
+
+    @Test
+    func mentionBurstIsScopedPerUserAndChannel() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            try stubBotRequest(request)
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.bot_mention_responses = ["hello {user_mention}"]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-user-a-1",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "hello <@bot-user>",
+                    author: DiscordUser(id: "friend-a", username: "friend-a", global_name: "Friend A"),
+                    webhook_id: nil
+                )
+            )
+        )
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-mention-user-b-1",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "hello <@bot-user>",
+                    author: DiscordUser(id: "friend-b", username: "friend-b", global_name: "Friend B"),
+                    webhook_id: nil
+                )
+            )
+        )
+
+        let messageRequests = stub.requests().filter { $0.url?.path == "/api/v10/channels/source-channel/messages" }
+        #expect(messageRequests.count == 2)
+
+        let payloads = try messageRequests.map { try decodeRequestBody(DiscordMessageCreate.self, from: $0) }
+        #expect(payloads[0].content == "hello <@friend-a>")
+        #expect(payloads[1].content == "hello <@friend-b>")
     }
 
     @Test
@@ -198,6 +280,55 @@ struct FizzeBotTests {
         )
         let payload = try decodeRequestBody(DiscordMessageCreate.self, from: messageRequest)
         #expect(payload.content == "iconic sparkle")
+    }
+
+    @Test
+    func iconicCooldownIsScopedPerChannel() async throws {
+        let rootURL = try makeTemporaryTestDirectory()
+        let stub = makeDiscordRESTClient { request in
+            try stubBotRequest(request)
+        }
+        let configURL = rootURL.appendingPathComponent("fizze-assistant.json")
+        try writeConfigurationFile(
+            makeConfigurationFile(rootURL: rootURL) { configuration in
+                configuration.iconic_messages = [
+                    "fizze time": IconicMessageConfiguration(content: "sparkle", embeds: nil),
+                ]
+            },
+            to: configURL
+        )
+        let store = try ConfigurationStore.load(from: configURL, environment: ["DISCORD_BOT_TOKEN": "token"])
+        let bot = try await FizzeBot(configurationStore: store, restClient: stub.client, logger: .init(label: "test"))
+
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-iconic-channel-a",
+                    channel_id: "source-channel",
+                    guild_id: "guild",
+                    content: "FIZZE TIME",
+                    author: DiscordUser(id: "friend-7", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+        await bot.handleEventForTesting(
+            .message(
+                DiscordMessageEvent(
+                    id: "message-iconic-channel-b",
+                    channel_id: "other-channel",
+                    guild_id: "guild",
+                    content: "FIZZE TIME",
+                    author: DiscordUser(id: "friend-8", username: "friend", global_name: "Friend"),
+                    webhook_id: nil
+                )
+            )
+        )
+
+        let sourceChannelRequests = stub.requests().filter { $0.url?.path == "/api/v10/channels/source-channel/messages" }
+        let otherChannelRequests = stub.requests().filter { $0.url?.path == "/api/v10/channels/other-channel/messages" }
+        #expect(sourceChannelRequests.count == 1)
+        #expect(otherChannelRequests.count == 1)
     }
 
     @Test

@@ -45,7 +45,11 @@ private enum EventHandlingError: LocalizedError {
 actor FizzeBot {
     // MARK: Stored Properties
 
-    private static let mentionReplyCooldownKey = "__bot_mention_reply__"
+    private static let mentionCooldownNotices = [
+        "Whoa, whoa, slow down there. I'll give you time to catch your breath...",
+        "*turns down the thermostat*\nCooldown mode initiated...",
+        "*backs away slowly, startled by all the pings*",
+    ]
 
     private let configurationStore: ConfigurationStore
     private let restClient: DiscordRESTClient
@@ -296,25 +300,40 @@ actor FizzeBot {
             cooldown: configuration.trigger_cooldown_seconds,
             matchingMode: configuration.trigger_matching_mode
         )
-        if let response = await engine.response(for: event.content) {
-            return PlannedMessageResponse(
-                event: event,
-                action: .iconic(response)
-            )
+        if let matched = engine.matchedResponse(for: event.content) {
+            let iconicCooldownKey = "iconic:\(event.channel_id):\(matched.trigger)"
+            if await responseCooldownGate.allowsResponse(
+                for: iconicCooldownKey,
+                cooldown: configuration.trigger_cooldown_seconds
+            ) {
+                return PlannedMessageResponse(
+                    event: event,
+                    action: .iconic(matched.response)
+                )
+            }
         }
 
         guard containsBotMention(in: event.content, botUserID: botUserID) else { return nil }
-        guard
-            let template = configuration.bot_mention_responses.randomElement(),
-            await responseCooldownGate.allowsResponse(
-                for: Self.mentionReplyCooldownKey,
-                cooldown: configuration.trigger_cooldown_seconds
-            )
-        else {
+        let mentionCooldownKey = "mention:\(event.channel_id):\(event.author.id)"
+        let mentionDecision = await responseCooldownGate.mentionBurstDecision(
+            for: mentionCooldownKey,
+            cooldown: configuration.trigger_cooldown_seconds
+        )
+
+        let response: String
+        switch mentionDecision {
+        case .sendStandardReply:
+            guard let template = configuration.bot_mention_responses.randomElement() else {
+                return nil
+            }
+            response = TemplateRenderer.render(template, user: event.author, guildName: guildName)
+
+        case .sendCooldownNotice:
+            response = Self.mentionCooldownNotices.randomElement() ?? "Cooldown mode initiated..."
+
+        case .suppress:
             return nil
         }
-
-        let response = TemplateRenderer.render(template, user: event.author, guildName: guildName)
         return PlannedMessageResponse(
             event: event,
             action: .mention(response)
