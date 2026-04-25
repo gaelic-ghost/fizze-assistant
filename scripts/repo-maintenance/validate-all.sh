@@ -2,7 +2,7 @@
 set -eu
 
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-REPO_MAINTENANCE_COMMON_DIR="$SELF_DIR/lib"
+export REPO_MAINTENANCE_COMMON_DIR="$SELF_DIR/lib"
 . "$SELF_DIR/lib/common.sh"
 
 load_profile_env

@@ -1,7 +1,12 @@
 #!/usr/bin/env sh
 set -eu
 
-COMMON_DIR=${REPO_MAINTENANCE_COMMON_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}
+COMMON_DIR="${REPO_MAINTENANCE_COMMON_DIR:-}"
+
+if [ -z "$COMMON_DIR" ]; then
+  COMMON_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+fi
+
 REPO_MAINTENANCE_ROOT=$(CDPATH= cd -- "$COMMON_DIR/.." && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$REPO_MAINTENANCE_ROOT/../.." && pwd)
 REPO_MAINTENANCE_PROFILE="generic"
@@ -34,7 +39,7 @@ load_profile_env() {
 }
 
 ensure_git_repo() {
-  git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "The repo-maintenance toolkit must run inside a git worktree rooted at $REPO_ROOT."
+  git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "maintain-project-repo must run inside a git worktree rooted at $REPO_ROOT."
 }
 
 run_dispatch_dir() {

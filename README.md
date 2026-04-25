@@ -2,6 +2,101 @@
 
 `Fizze Assistant` is a one-off Swift command-line Discord bot for some friends in a single Discord server: `https://discord.gg/2kz68FvyJg`. It connects to Discord over the Gateway for realtime events and uses the Discord HTTP API for commands, messages, role assignment, and audit-log lookups.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [Development](#development)
+- [Repo Structure](#repo-structure)
+- [Release Notes](#release-notes)
+- [License](#license)
+- [What It Does](#what-it-does)
+- [Why This Shape](#why-this-shape)
+- [Project Layout](#project-layout)
+- [Requirements](#requirements)
+- [Developer Portal Setup](#developer-portal-setup)
+- [Required Discord Permissions](#required-discord-permissions)
+- [Configuration](#configuration)
+- [Commands](#commands)
+- [SSH-Friendly Startup](#ssh-friendly-startup)
+- [Secret Safety](#secret-safety)
+- [Current Limitations](#current-limitations)
+- [Planned Directions](#planned-directions)
+
+## Overview
+
+### Status
+
+Fizze Assistant is in active private use for one Discord server and remains tailored to that server instead of being packaged as a reusable bot framework.
+
+### What This Project Is
+
+Fizze Assistant is a Swift Package Manager command-line bot that connects to Discord, manages server onboarding and moderation helpers, and stores only the local state it needs for runtime config and warning history. The repo owns the bot executable, its Swift tests, non-secret baseline config, SSH-friendly helper scripts, and local maintainer automation.
+
+### Motivation
+
+The project exists to keep one friends' server easier to run without turning those server-specific needs into a general-purpose Discord platform. It stays small so the bot can be understood, checked, and restarted from an ordinary Mac shell.
+
+## Quick Start
+
+This bot is meant for the configured private server, so there is not a generic public quick start. For local development, install Swift 6.2 or newer, keep `DISCORD_BOT_TOKEN` in your shell environment, copy the committed config to an untracked local config, and use the commands in [Development](#development) and [Commands](#commands).
+
+## Usage
+
+Normal use is operator-driven: build the executable, validate the Discord setup, register guild-scoped slash commands, and run the long-lived bot process.
+
+```bash
+swift run fizze-assistant config validate
+swift run fizze-assistant check
+swift run fizze-assistant register-commands
+swift run fizze-assistant run
+```
+
+On the Mac mini deployment path, the helper scripts under `scripts/` wrap the same build, check, register, run, start, and stop flow.
+
+## Development
+
+### Setup
+
+Use Swift 6.2 or newer, install the Discord bot in the target server, enable the required privileged intents in the Discord Developer Portal, and keep the bot token in `DISCORD_BOT_TOKEN`. For local runtime edits, copy `fizze-assistant.json` to `fizze-assistant-local.json` and keep the local file untracked.
+
+### Workflow
+
+Treat `Package.swift` as the SwiftPM source of truth. Make source and test changes in matching feature areas, keep non-secret config changes in the committed baseline only when they should sync across machines, and use the repo-maintenance scripts for shared validation and release work.
+
+### Validation
+
+Run the Swift package checks and the repo-maintenance gate before handing work back:
+
+```bash
+swift build
+swift test
+bash scripts/repo-maintenance/validate-all.sh
+```
+
+## Repo Structure
+
+```text
+.
+├── Package.swift
+├── Sources/FizzeAssistant/
+├── Tests/FizzeAssistantTests/
+├── fizze-assistant.json
+├── scripts/
+└── scripts/repo-maintenance/
+```
+
+The source and test trees are intentionally aligned by feature area so nearby behavior and coverage stay easy to find together.
+
+## Release Notes
+
+This repo uses `scripts/repo-maintenance/release.sh` for release flow automation when a tagged release is needed. Notable planned work and shipped direction live in `ROADMAP.md` until the project grows a dedicated release-notes surface.
+
+## License
+
+No license file is currently committed.
+
 ## What It Does
 
 - Welcomes new members in a configured channel
@@ -85,7 +180,7 @@ https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20a
 
 The bot now uses one committed JSON config file as the shared baseline for all non-secret settings:
 
-- [fizze-assistant.json](/Users/galew/Workspace/fizze-assistant/fizze-assistant.json)
+- [fizze-assistant.json](./fizze-assistant.json)
 - `fizze-assistant-local.json` for untracked live runtime overrides
 
 The committed baseline holds the Discord IDs, channel settings, role gates, message templates, and trigger configuration. The only secret that stays outside git is the bot token.
