@@ -1,22 +1,98 @@
 # AGENTS.md
 
+Use this file for durable repo-local guidance that Codex should follow before changing code, docs, or project workflow surfaces in this repository.
+
+## Repository Scope
+
+### What This File Covers
+
+This root-level file governs the Swift Package Manager Discord bot, its tests, repository docs, local helper scripts, and repo-maintenance release and validation surface.
+
+### Where To Look First
+
+- `Package.swift` for package products, targets, dependencies, platform, and language mode.
+- `README.md` and `ROADMAP.md` for current operator behavior and planned project direction.
+- `Sources/FizzeAssistant/` and `Tests/FizzeAssistantTests/` for source and matching test coverage.
+- `fizze-assistant.json` for the committed non-secret config baseline.
+- `scripts/repo-maintenance/` for validation, shared sync, and release entrypoints.
+
+## Working Rules
+
+### Change Scope
+
+Keep changes focused on the requested bot behavior, docs, tests, or maintainer surface. If a change starts turning this one-server bot into a reusable multi-server framework, stop and make that scope expansion explicit before implementing it.
+
+### Source of Truth
+
+Use Swift Package Manager as the source of truth for package structure and dependencies. Prefer `swift package` CLI commands for structural changes when available; otherwise update `Package.swift` intentionally and keep package graph edits grouped with `Package.resolved` and matching target or test layout changes.
+
+### Communication and Escalation
+
+Surface tradeoffs before changing Discord permission assumptions, runtime config ownership, release behavior, or deployment scripts. Any setup issue that can be fixed from Discord itself should stay non-blocking at startup and should be reported in calm, actionable operator language.
+
+## Commands
+
+### Setup
+
+```bash
+swift build
+cp fizze-assistant.json fizze-assistant-local.json
+swift run fizze-assistant config validate
+swift run fizze-assistant check
+```
+
+### Validation
+
+```bash
+swift build
+swift test
+bash scripts/repo-maintenance/validate-all.sh
+```
+
+### Optional Project Commands
+
+```bash
+swift run fizze-assistant register-commands
+swift run fizze-assistant run
+./scripts/setup.sh
+./scripts/start-nohup.sh
+./scripts/stop.sh
+```
+
+## Review and Delivery
+
+### Review Expectations
+
+Before handing work back, summarize the changed repo surfaces, call out any Discord setup or deployment implications, and report the exact validation commands that ran.
+
+### Definition of Done
+
+Work is done when the relevant source, tests, docs, and local scripts agree; `swift build`, `swift test`, and `bash scripts/repo-maintenance/validate-all.sh` have either passed or any blocker is reported clearly; and no secrets or local runtime config files are staged.
+
+## Safety Boundaries
+
+### Never Do
+
+- Never commit Discord bot tokens, `.env` files, or `fizze-assistant-local.json`.
+- Never replace Discord-owned state with local source-of-truth files unless Gale explicitly asks for that architecture change.
+- Never make a setup issue startup-blocking when the same issue can be fixed from Discord after the bot starts.
+- Never hand-edit generated package-manager output such as `Package.resolved`.
+
+### Ask Before
+
+- Ask before changing the public/private repo posture, release policy, or deployment model.
+- Ask before widening this project into a reusable multi-server bot framework.
+- Ask before changing committed Discord IDs, role gates, or channel routing unless the request is specifically about those settings.
+
+## Local Overrides
+
+There are no deeper repo-local AGENTS files currently. If a narrower AGENTS file is added later, its guidance refines this root file for work in that subtree.
+
 ## Baseline Provenance
 
 - This template is the full bootstrap `AGENTS.md` used for new Swift package repositories.
 - It intentionally incorporates the shared Swift/Apple baseline from `shared/agents-snippets/apple-swift-core.md`.
 - Keep baseline guidance aligned with the shared snippet and use this template for deterministic scaffold output.
-
-## Repository Expectations
-
-- Use Swift Package Manager (SPM) as the source of truth for package structure and dependencies.
-- Prefer `swift package` CLI commands for structural changes whenever the command exists.
-- Use `swift package add-dependency` to add dependencies instead of hand-editing package graphs.
-- Use `swift package add-target` to add library, executable, or test targets.
-- For package configuration not covered by CLI commands, update `Package.swift` intentionally and keep edits minimal.
-- Keep package graph updates together in the same change (`Package.swift`, `Package.resolved`, and target/test layout when applicable).
-- Validate package changes with:
-  - `swift build`
-  - `swift test`
 
 ## Swift Coding Preferences
 
