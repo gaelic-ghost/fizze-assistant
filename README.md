@@ -53,7 +53,7 @@ swift run fizze-assistant register-commands
 swift run fizze-assistant run
 ```
 
-On the Mac mini deployment path, the helper scripts under `scripts/` wrap the same build, check, register, run, start, and stop flow.
+For a long-lived local deployment, the helper scripts under `scripts/` wrap the same build, check, register, run, start, and stop flow.
 
 ## Development
 
@@ -192,7 +192,7 @@ For iconic responses, the committed config now includes:
 
 `DISCORD_BOT_TOKEN` stays environment-only and is never editable from Discord.
 
-On a deployment machine such as the Mac mini, you can also keep the token in `.env.local`:
+If you want a file-backed local token setup, you can also keep the token in `.env.local`:
 
 ```bash
 export DISCORD_BOT_TOKEN="YOUR_BOT_TOKEN"
@@ -214,7 +214,7 @@ swift run fizze-assistant run
 
 Without `--config`, the bot now prefers `fizze-assistant-local.json`, then falls back to the tracked `fizze-assistant.json`. Once the local file exists, live `/config` and wizard changes stay out of git by default.
 
-Build a release binary for the Mac mini:
+Build a release binary for a long-lived local bot process:
 
 ```bash
 swift build -c release
@@ -224,7 +224,7 @@ swift build -c release
 .build/release/fizze-assistant run
 ```
 
-There is also a thin setup script for the Mac mini flow. It loads `.env.local`, rebuilds the release binary when it is missing or stale, runs `check`, registers commands, and then starts the bot:
+There is also a thin setup script for the long-lived local process flow. It uses `DISCORD_BOT_TOKEN` from the current shell environment, optionally loads `.env.local` when that file exists, rebuilds the release binary when it is missing or stale, runs `check`, registers commands, and then starts the bot:
 
 ```bash
 ./scripts/setup.sh

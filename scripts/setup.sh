@@ -7,17 +7,14 @@ ENV_FILE="${ENV_FILE:-$REPO_DIR/.env.local}"
 CONFIG_FILE="${CONFIG_FILE:-$REPO_DIR/fizze-assistant-local.json}"
 BINARY_PATH="${BINARY_PATH:-$REPO_DIR/.build/release/fizze-assistant}"
 
-if [ ! -f "$ENV_FILE" ]; then
-  echo "Missing env file: $ENV_FILE" >&2
-  echo "Create it with: export DISCORD_BOT_TOKEN=\"your_bot_token\"" >&2
-  exit 1
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
 fi
 
-# shellcheck disable=SC1090
-. "$ENV_FILE"
-
 if [ -z "${DISCORD_BOT_TOKEN:-}" ]; then
-  echo "DISCORD_BOT_TOKEN is not set after loading $ENV_FILE" >&2
+  echo "DISCORD_BOT_TOKEN is not set in the current shell environment." >&2
+  echo "Export it before running this script, or create $ENV_FILE with: export DISCORD_BOT_TOKEN=\"your_bot_token\"" >&2
   exit 1
 fi
 
